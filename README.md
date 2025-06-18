@@ -1,1 +1,1 @@
-# idedersplanyedek
+# idedersplan
