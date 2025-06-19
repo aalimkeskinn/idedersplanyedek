@@ -32,7 +32,7 @@ const Subjects = () => {
   const [formData, setFormData] = useState({
     name: '',
     branch: '',
-    levels: [] as string[], // Çoklu seviye seçimi için array
+    level: '',
     weeklyHours: ''
   });
 
@@ -104,48 +104,18 @@ const Subjects = () => {
     );
   };
 
-  // UPDATED: Handle multiple levels submission
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (formData.levels.length === 0) {
-      error('❌ Seviye Seçimi Gerekli', 'En az bir eğitim seviyesi seçmelisiniz');
-      return;
-    }
+    const subjectData = {
+      ...formData,
+      weeklyHours: parseInt(formData.weeklyHours)
+    };
 
-    try {
-      if (editingSubject) {
-        // Editing mode - update existing subject
-        const subjectData = {
-          name: formData.name,
-          branch: formData.branch,
-          level: formData.levels[0], // For editing, use first selected level
-          weeklyHours: parseInt(formData.weeklyHours)
-        };
-        await update(editingSubject.id, subjectData);
-        success('✅ Ders Güncellendi', `${formData.name} başarıyla güncellendi`);
-      } else {
-        // Adding mode - create subjects for each selected level
-        let addedCount = 0;
-        for (const level of formData.levels) {
-          const subjectData = {
-            name: formData.name,
-            branch: formData.branch,
-            level: level as Subject['level'],
-            weeklyHours: parseInt(formData.weeklyHours)
-          };
-          await add(subjectData as Omit<Subject, 'id' | 'createdAt'>);
-          addedCount++;
-        }
-        
-        if (addedCount === 1) {
-          success('✅ Ders Eklendi', `${formData.name} başarıyla eklendi`);
-        } else {
-          success('✅ Dersler Eklendi', `${formData.name} ${addedCount} seviye için başarıyla eklendi`);
-        }
-      }
-    } catch (err) {
-      error('❌ Hata', 'Ders kaydedilirken bir hata oluştu');
+    if (editingSubject) {
+      await update(editingSubject.id, subjectData);
+    } else {
+      await add(subjectData as Omit<Subject, 'id' | 'createdAt'>);
     }
     
     resetForm();
@@ -172,7 +142,7 @@ const Subjects = () => {
   };
 
   const resetForm = () => {
-    setFormData({ name: '', branch: '', levels: [], weeklyHours: '' });
+    setFormData({ name: '', branch: '', level: '', weeklyHours: '' });
     setEditingSubject(null);
     setIsModalOpen(false);
   };
@@ -181,7 +151,7 @@ const Subjects = () => {
     setFormData({
       name: subject.name,
       branch: subject.branch,
-      levels: [subject.level], // Convert single level to array for editing
+      level: subject.level,
       weeklyHours: subject.weeklyHours.toString()
     });
     setEditingSubject(subject);
@@ -199,24 +169,6 @@ const Subjects = () => {
         }
       );
     }
-  };
-
-  // UPDATED: Handle level selection/deselection
-  const handleLevelToggle = (level: string) => {
-    setFormData(prev => {
-      const isSelected = prev.levels.includes(level);
-      if (isSelected) {
-        return {
-          ...prev,
-          levels: prev.levels.filter(l => l !== level)
-        };
-      } else {
-        return {
-          ...prev,
-          levels: [...prev.levels, level]
-        };
-      }
-    });
   };
 
   const addBulkRow = () => {
@@ -430,7 +382,7 @@ const Subjects = () => {
         </div>
       )}
 
-      {/* UPDATED: Single Subject Modal with Multiple Level Selection */}
+      {/* Single Subject Modal */}
       <Modal
         isOpen={isModalOpen}
         onClose={resetForm}
@@ -453,36 +405,13 @@ const Subjects = () => {
             required
           />
           
-          {/* UPDATED: Multiple Level Selection */}
-          <div className="mb-4">
-            <label className="block text-sm font-semibold text-gray-800 mb-2">
-              Eğitim Seviyeleri <span className="text-red-500">*</span>
-            </label>
-            <div className="space-y-2 p-3 border border-gray-300 rounded-lg bg-gray-50">
-              {EDUCATION_LEVELS.map((level) => (
-                <label key={level} className="flex items-center space-x-3 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={formData.levels.includes(level)}
-                    onChange={() => handleLevelToggle(level)}
-                    className="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500"
-                    disabled={editingSubject} // Disable multiple selection when editing
-                  />
-                  <span className="text-sm font-medium text-gray-700">{level}</span>
-                </label>
-              ))}
-            </div>
-            {editingSubject && (
-              <p className="text-xs text-gray-500 mt-1">
-                Düzenleme modunda seviye değiştirilemez
-              </p>
-            )}
-            {!editingSubject && formData.levels.length > 1 && (
-              <p className="text-xs text-blue-600 mt-1">
-                ✨ {formData.levels.length} seviye için ayrı dersler oluşturulacak
-              </p>
-            )}
-          </div>
+          <Select
+            label="Eğitim Seviyesi"
+            value={formData.level}
+            onChange={(value) => setFormData({ ...formData, level: value })}
+            options={levelOptions}
+            required
+          />
 
           <Input
             label="Haftalık Ders Saati"
@@ -504,7 +433,6 @@ const Subjects = () => {
             <Button
               type="submit"
               variant="primary"
-              disabled={formData.levels.length === 0}
             >
               {editingSubject ? 'Güncelle' : 'Kaydet'}
             </Button>
