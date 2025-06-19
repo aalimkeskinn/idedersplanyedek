@@ -34,7 +34,8 @@ const Teachers = () => {
   const [formData, setFormData] = useState({
     name: '',
     branches: [] as string[], // Çoklu branş seçimi için array
-    level: ''
+    level: '',
+    levels: [] as string[] // Çoklu seviye seçimi için array
   });
 
   // Get unique branches from subjects
@@ -109,12 +110,17 @@ const Teachers = () => {
     );
   };
 
-  // UPDATED: Handle multiple branches submission
+  // UPDATED: Handle multiple branches and levels submission
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
     if (formData.branches.length === 0) {
       error('❌ Branş Seçimi Gerekli', 'En az bir branş seçmelisiniz');
+      return;
+    }
+
+    if (formData.levels.length === 0) {
+      error('❌ Seviye Seçimi Gerekli', 'En az bir eğitim seviyesi seçmelisiniz');
       return;
     }
 
@@ -124,19 +130,28 @@ const Teachers = () => {
         const teacherData = {
           name: formData.name,
           branch: formData.branches.join(', '), // Join multiple branches with comma
-          level: formData.level
+          level: formData.levels[0] // For editing, use first selected level
         };
         await update(editingTeacher.id, teacherData);
         success('✅ Öğretmen Güncellendi', `${formData.name} başarıyla güncellendi`);
       } else {
-        // Adding mode - create teacher with joined branches
-        const teacherData = {
-          name: formData.name,
-          branch: formData.branches.join(', '), // Join multiple branches with comma
-          level: formData.level
-        };
-        await add(teacherData as Omit<Teacher, 'id' | 'createdAt'>);
-        success('✅ Öğretmen Eklendi', `${formData.name} başarıyla eklendi`);
+        // Adding mode - create teacher for each selected level
+        let addedCount = 0;
+        for (const level of formData.levels) {
+          const teacherData = {
+            name: formData.name,
+            branch: formData.branches.join(', '), // Join multiple branches with comma
+            level: level as Teacher['level']
+          };
+          await add(teacherData as Omit<Teacher, 'id' | 'createdAt'>);
+          addedCount++;
+        }
+        
+        if (addedCount === 1) {
+          success('✅ Öğretmen Eklendi', `${formData.name} başarıyla eklendi`);
+        } else {
+          success('✅ Öğretmenler Eklendi', `${formData.name} ${addedCount} seviye için başarıyla eklendi`);
+        }
       }
     } catch (err) {
       error('❌ Hata', 'Öğretmen kaydedilirken bir hata oluştu');
@@ -165,7 +180,7 @@ const Teachers = () => {
   };
 
   const resetForm = () => {
-    setFormData({ name: '', branches: [], level: '' });
+    setFormData({ name: '', branches: [], level: '', levels: [] });
     setEditingTeacher(null);
     setIsModalOpen(false);
   };
@@ -177,7 +192,8 @@ const Teachers = () => {
     setFormData({
       name: teacher.name,
       branches: branchesArray,
-      level: teacher.level
+      level: teacher.level,
+      levels: [teacher.level] // Convert single level to array for editing
     });
     setEditingTeacher(teacher);
     setIsModalOpen(true);
@@ -209,6 +225,24 @@ const Teachers = () => {
         return {
           ...prev,
           branches: [...prev.branches, branch]
+        };
+      }
+    });
+  };
+
+  // UPDATED: Handle level selection/deselection
+  const handleLevelToggle = (level: string) => {
+    setFormData(prev => {
+      const isSelected = prev.levels.includes(level);
+      if (isSelected) {
+        return {
+          ...prev,
+          levels: prev.levels.filter(l => l !== level)
+        };
+      } else {
+        return {
+          ...prev,
+          levels: [...prev.levels, level]
         };
       }
     });
@@ -556,7 +590,7 @@ const Teachers = () => {
         </>
       )}
 
-      {/* UPDATED: Single Teacher Modal with Multiple Branch Selection */}
+      {/* UPDATED: Single Teacher Modal with Multiple Branch and Level Selection */}
       <Modal
         isOpen={isModalOpen}
         onClose={resetForm}
@@ -596,13 +630,36 @@ const Teachers = () => {
             )}
           </div>
           
-          <Select
-            label="Eğitim Seviyesi"
-            value={formData.level}
-            onChange={(value) => setFormData({ ...formData, level: value })}
-            options={levelOptions}
-            required
-          />
+          {/* UPDATED: Multiple Level Selection */}
+          <div className="mb-4">
+            <label className="block text-sm font-semibold text-gray-800 mb-2">
+              Eğitim Seviyeleri <span className="text-red-500">*</span>
+            </label>
+            <div className="space-y-2 p-3 border border-gray-300 rounded-lg bg-gray-50">
+              {EDUCATION_LEVELS.map((level) => (
+                <label key={level} className="flex items-center space-x-3 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={formData.levels.includes(level)}
+                    onChange={() => handleLevelToggle(level)}
+                    className="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500"
+                    disabled={editingTeacher} // Disable multiple selection when editing
+                  />
+                  <span className="text-sm font-medium text-gray-700">{level}</span>
+                </label>
+              ))}
+            </div>
+            {editingTeacher && (
+              <p className="text-xs text-gray-500 mt-1">
+                Düzenleme modunda seviye değiştirilemez
+              </p>
+            )}
+            {!editingTeacher && formData.levels.length > 1 && (
+              <p className="text-xs text-blue-600 mt-1">
+                ✨ {formData.levels.length} seviye için ayrı öğretmenler oluşturulacak
+              </p>
+            )}
+          </div>
 
           <div className="button-group-mobile mt-6">
             <Button
@@ -615,7 +672,7 @@ const Teachers = () => {
             <Button
               type="submit"
               variant="primary"
-              disabled={formData.branches.length === 0}
+              disabled={formData.branches.length === 0 || formData.levels.length === 0}
             >
               {editingTeacher ? 'Güncelle' : 'Kaydet'}
             </Button>
