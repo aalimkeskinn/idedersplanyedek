@@ -285,23 +285,68 @@ const ScheduleWizard = () => {
                 {WIZARD_STEPS.map((step, index) => {
                   const isCompleted = completedSteps.has(index);
                   const isCurrent = index === currentStepIndex;
-                  const isAccessible = completedSteps.has(index) || isCurrent || completedSteps.has(index - 1);
+                  const isAccessible = completedSteps.has(index) || isCurrent || completedSteps.has(index - 1) || index === 0;
+                  
                   return (
-                    <button key={step.id} onClick={() => handleStepClick(index)} disabled={!isAccessible}
-                      className={`w-full text-left p-3 rounded-lg border-2 transition-all duration-200 ${
-                        isCurrent ? 'bg-blue-50 border-blue-400' :
-                        isCompleted ? 'bg-green-50 border-green-300' :
-                        isAccessible ? 'bg-white border-gray-200 hover:bg-gray-50' : 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                    <button 
+                      key={step.id} 
+                      onClick={() => handleStepClick(index)} 
+                      disabled={!isAccessible}
+                      className={`w-full text-left p-4 rounded-xl border-2 transition-all duration-300 transform hover:scale-[1.02] ${
+                        isCurrent 
+                          ? 'bg-gradient-to-r from-blue-50 to-indigo-50 border-blue-400 shadow-lg ring-2 ring-blue-200' 
+                          : isCompleted 
+                          ? 'bg-gradient-to-r from-green-50 to-emerald-50 border-green-300 hover:border-green-400 shadow-md' 
+                          : isAccessible 
+                          ? 'bg-white border-gray-200 hover:bg-gray-50 hover:border-gray-300 shadow-sm hover:shadow-md' 
+                          : 'bg-gray-50 border-gray-100 text-gray-400 cursor-not-allowed opacity-60'
                       }`}
                     >
-                      <div className="flex items-center space-x-3">
-                        <div className={`w-8 h-8 rounded-full flex items-center justify-center text-white ${isCurrent ? 'bg-blue-500' : isCompleted ? 'bg-green-500' : 'bg-gray-300'}`}>
-                          {isCompleted ? <Check size={18} /> : <span>{index + 1}</span>}
+                      <div className="flex items-center space-x-4">
+                        <div className={`w-10 h-10 rounded-full flex items-center justify-center text-white font-bold text-sm transition-all duration-300 ${
+                          isCurrent 
+                            ? 'bg-gradient-to-r from-blue-500 to-indigo-500 shadow-lg ring-2 ring-blue-300' 
+                            : isCompleted 
+                            ? 'bg-gradient-to-r from-green-500 to-emerald-500 shadow-md' 
+                            : isAccessible 
+                            ? 'bg-gradient-to-r from-gray-400 to-gray-500' 
+                            : 'bg-gray-300'
+                        }`}>
+                          {isCompleted ? (
+                            <Check size={20} className="animate-scale-in" />
+                          ) : (
+                            <span className="text-sm font-bold">{index + 1}</span>
+                          )}
                         </div>
-                        <div className="flex-1">
-                          <p className="font-medium text-sm">{step.title}</p>
-                          <p className="text-xs text-gray-500 truncate">{step.description}</p>
+                        <div className="flex-1 min-w-0">
+                          <p className={`font-semibold text-sm leading-tight transition-colors duration-300 ${
+                            isCurrent 
+                              ? 'text-blue-700' 
+                              : isCompleted 
+                              ? 'text-green-700' 
+                              : isAccessible 
+                              ? 'text-gray-700' 
+                              : 'text-gray-400'
+                          }`}>
+                            {step.title}
+                          </p>
+                          <p className={`text-xs mt-1 leading-tight transition-colors duration-300 ${
+                            isCurrent 
+                              ? 'text-blue-600' 
+                              : isCompleted 
+                              ? 'text-green-600' 
+                              : isAccessible 
+                              ? 'text-gray-500' 
+                              : 'text-gray-400'
+                          }`}>
+                            {step.description}
+                          </p>
                         </div>
+                        {isCurrent && (
+                          <div className="flex-shrink-0">
+                            <div className="w-2 h-2 bg-blue-500 rounded-full animate-pulse"></div>
+                          </div>
+                        )}
                       </div>
                     </button>
                   );
