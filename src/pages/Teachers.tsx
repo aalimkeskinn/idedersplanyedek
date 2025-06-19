@@ -33,7 +33,7 @@ const Teachers = () => {
   ]);
   const [formData, setFormData] = useState({
     name: '',
-    branch: '',
+    branches: [] as string[], // Çoklu branş seçimi için array
     level: ''
   });
 
@@ -109,13 +109,37 @@ const Teachers = () => {
     );
   };
 
+  // UPDATED: Handle multiple branches submission
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (editingTeacher) {
-      await update(editingTeacher.id, formData);
-    } else {
-      await add(formData as Omit<Teacher, 'id' | 'createdAt'>);
+    if (formData.branches.length === 0) {
+      error('❌ Branş Seçimi Gerekli', 'En az bir branş seçmelisiniz');
+      return;
+    }
+
+    try {
+      if (editingTeacher) {
+        // Editing mode - update existing teacher
+        const teacherData = {
+          name: formData.name,
+          branch: formData.branches.join(', '), // Join multiple branches with comma
+          level: formData.level
+        };
+        await update(editingTeacher.id, teacherData);
+        success('✅ Öğretmen Güncellendi', `${formData.name} başarıyla güncellendi`);
+      } else {
+        // Adding mode - create teacher with joined branches
+        const teacherData = {
+          name: formData.name,
+          branch: formData.branches.join(', '), // Join multiple branches with comma
+          level: formData.level
+        };
+        await add(teacherData as Omit<Teacher, 'id' | 'createdAt'>);
+        success('✅ Öğretmen Eklendi', `${formData.name} başarıyla eklendi`);
+      }
+    } catch (err) {
+      error('❌ Hata', 'Öğretmen kaydedilirken bir hata oluştu');
     }
     
     resetForm();
@@ -141,15 +165,18 @@ const Teachers = () => {
   };
 
   const resetForm = () => {
-    setFormData({ name: '', branch: '', level: '' });
+    setFormData({ name: '', branches: [], level: '' });
     setEditingTeacher(null);
     setIsModalOpen(false);
   };
 
   const handleEdit = (teacher: Teacher) => {
+    // Split branch string into array for editing
+    const branchesArray = teacher.branch.split(', ').map(b => b.trim());
+    
     setFormData({
       name: teacher.name,
-      branch: teacher.branch,
+      branches: branchesArray,
       level: teacher.level
     });
     setEditingTeacher(teacher);
@@ -167,6 +194,24 @@ const Teachers = () => {
         }
       );
     }
+  };
+
+  // UPDATED: Handle branch selection/deselection
+  const handleBranchToggle = (branch: string) => {
+    setFormData(prev => {
+      const isSelected = prev.branches.includes(branch);
+      if (isSelected) {
+        return {
+          ...prev,
+          branches: prev.branches.filter(b => b !== branch)
+        };
+      } else {
+        return {
+          ...prev,
+          branches: [...prev.branches, branch]
+        };
+      }
+    });
   };
 
   const addBulkRow = () => {
@@ -511,7 +556,7 @@ const Teachers = () => {
         </>
       )}
 
-      {/* Single Teacher Modal */}
+      {/* UPDATED: Single Teacher Modal with Multiple Branch Selection */}
       <Modal
         isOpen={isModalOpen}
         onClose={resetForm}
@@ -526,13 +571,30 @@ const Teachers = () => {
             required
           />
           
-          <Select
-            label="Branş"
-            value={formData.branch}
-            onChange={(value) => setFormData({ ...formData, branch: value })}
-            options={branchOptions}
-            required
-          />
+          {/* UPDATED: Multiple Branch Selection */}
+          <div className="mb-4">
+            <label className="block text-sm font-semibold text-gray-800 mb-2">
+              Branşlar <span className="text-red-500">*</span>
+            </label>
+            <div className="space-y-2 p-3 border border-gray-300 rounded-lg bg-gray-50 max-h-60 overflow-y-auto">
+              {branchOptions.map((branch) => (
+                <label key={branch.value} className="flex items-center space-x-3 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={formData.branches.includes(branch.value)}
+                    onChange={() => handleBranchToggle(branch.value)}
+                    className="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500"
+                  />
+                  <span className="text-sm font-medium text-gray-700">{branch.label}</span>
+                </label>
+              ))}
+            </div>
+            {formData.branches.length > 0 && (
+              <p className="text-xs text-blue-600 mt-1">
+                ✨ Seçilen branşlar: {formData.branches.join(', ')}
+              </p>
+            )}
+          </div>
           
           <Select
             label="Eğitim Seviyesi"
@@ -553,6 +615,7 @@ const Teachers = () => {
             <Button
               type="submit"
               variant="primary"
+              disabled={formData.branches.length === 0}
             >
               {editingTeacher ? 'Güncelle' : 'Kaydet'}
             </Button>
