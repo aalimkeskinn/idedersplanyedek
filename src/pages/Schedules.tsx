@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { Calendar, Users, BookOpen, Building, Save, RotateCcw, AlertTriangle, X, Check, Filter } from 'lucide-react';
+import { Calendar, Users, BookOpen, Building, Save, RotateCcw, AlertTriangle, X, Check, Filter, Clock } from 'lucide-react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { Teacher, Class, Subject, Schedule, DAYS, PERIODS } from '../types';
+import { Teacher, Class, Subject, Schedule, DAYS, PERIODS, getTimeForPeriod, formatTimeRange } from '../types';
 import { useFirestore } from '../hooks/useFirestore';
 import { useToast } from '../hooks/useToast';
 import { useConfirmation } from '../hooks/useConfirmation';
@@ -499,6 +499,16 @@ const Schedules = () => {
     return null;
   };
 
+  // Get time info for a period
+  const getTimeInfo = (period: string) => {
+    const currentLevel = mode === 'teacher' ? selectedLevel as any : selectedClass?.level;
+    const timePeriod = getTimeForPeriod(period, currentLevel);
+    if (timePeriod) {
+      return formatTimeRange(timePeriod.startTime, timePeriod.endTime);
+    }
+    return `${period}. Ders`;
+  };
+
   // Get teacher options
   const teacherOptions = teachers.map(teacher => ({
     value: teacher.id,
@@ -718,7 +728,13 @@ const Schedules = () => {
                 {/* Preparation Period */}
                 <tr className="bg-blue-50">
                   <td className="px-3 py-2 font-medium text-gray-900 bg-blue-100 text-sm">
-                    Hazırlık
+                    <div className="flex flex-col items-center">
+                      <span>Hazırlık</span>
+                      <span className="text-xs text-gray-600 flex items-center mt-1">
+                        <Clock className="w-3 h-3 mr-1" />
+                        {mode === 'teacher' && selectedLevel === 'Ortaokul' ? '08:30-08:40' : '08:30-08:50'}
+                      </span>
+                    </div>
                   </td>
                   {DAYS.map(day => {
                     const fixedInfo = getFixedPeriodInfo(day, 'prep', mode === 'teacher' ? selectedLevel as any : selectedClass?.level);
@@ -748,11 +764,25 @@ const Schedules = () => {
                   
                   const showAfternoonBreakAfter = period === '8';
                   
+                  // Get time info for this period
+                  const timeInfo = getTimeInfo(period);
+                  
                   return (
                     <React.Fragment key={period}>
                       <tr className={isLunchPeriod ? 'bg-green-50' : ''}>
                         <td className={`px-3 py-2 font-medium text-gray-900 text-sm ${isLunchPeriod ? 'bg-green-100' : 'bg-gray-50'}`}>
-                          {isLunchPeriod ? 'Yemek' : `${period}.`}
+                          <div className="flex flex-col items-center">
+                            <span>{isLunchPeriod ? 'Yemek' : `${period}.`}</span>
+                            <span className="text-xs text-gray-600 flex items-center mt-1">
+                              <Clock className="w-3 h-3 mr-1" />
+                              {isLunchPeriod 
+                                ? ((mode === 'teacher' ? selectedLevel : selectedClass?.level) === 'İlkokul' || 
+                                   (mode === 'teacher' ? selectedLevel : selectedClass?.level) === 'Anaokulu' 
+                                     ? '11:50-12:25' 
+                                     : '12:30-13:05')
+                                : timeInfo}
+                            </span>
+                          </div>
                         </td>
                         {DAYS.map(day => {
                           if (isLunchPeriod) {
@@ -799,7 +829,13 @@ const Schedules = () => {
                       {showBreakfastAfter && (
                         <tr className="bg-yellow-50">
                           <td className="px-3 py-2 font-medium text-gray-900 bg-yellow-100 text-sm">
-                            Kahvaltı
+                            <div className="flex flex-col items-center">
+                              <span>Kahvaltı</span>
+                              <span className="text-xs text-gray-600 flex items-center mt-1">
+                                <Clock className="w-3 h-3 mr-1" />
+                                09:15-09:35
+                              </span>
+                            </div>
                           </td>
                           {DAYS.map(day => {
                             const fixedInfo = getFixedPeriodInfo(day, 'breakfast', mode === 'teacher' ? selectedLevel as any : selectedClass?.level);
@@ -821,7 +857,13 @@ const Schedules = () => {
                       {showAfternoonBreakAfter && (
                         <tr className="bg-yellow-50">
                           <td className="px-3 py-2 font-medium text-gray-900 bg-yellow-100 text-sm">
-                            İkindi Kahvaltısı
+                            <div className="flex flex-col items-center">
+                              <span>İkindi Kahvaltısı</span>
+                              <span className="text-xs text-gray-600 flex items-center mt-1">
+                                <Clock className="w-3 h-3 mr-1" />
+                                14:35-14:45
+                              </span>
+                            </div>
                           </td>
                           {DAYS.map(day => (
                             <td key={`${day}-afternoon-breakfast`} className="px-2 py-2">
