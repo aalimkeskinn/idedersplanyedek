@@ -8,6 +8,49 @@ export interface ScheduleValidationResult {
   constraintViolations: string[];
 }
 
+// Check if a schedule slot has conflicts
+export function checkSlotConflict(
+  mode: 'teacher' | 'class',
+  day: string,
+  period: string,
+  teacherId: string,
+  classId: string,
+  allSchedules: Schedule[],
+  currentScheduleId?: string
+): { hasConflict: boolean; conflictReason?: string } {
+  // Check for teacher conflicts across all schedules
+  if (mode === 'teacher') {
+    for (const schedule of allSchedules) {
+      if (currentScheduleId && schedule.id === currentScheduleId) continue;
+      
+      const slot = schedule.schedule[day]?.[period];
+      if (slot && slot.teacherId === teacherId && slot.classId !== 'fixed-period') {
+        return {
+          hasConflict: true,
+          conflictReason: `Öğretmen ${day} günü ${period}. ders saatinde başka bir sınıfta ders veriyor`
+        };
+      }
+    }
+  }
+
+  // Check for class conflicts across all schedules
+  if (mode === 'class') {
+    for (const schedule of allSchedules) {
+      if (currentScheduleId && schedule.id === currentScheduleId) continue;
+      
+      const slot = schedule.schedule[day]?.[period];
+      if (slot && slot.classId === classId && slot.classId !== 'fixed-period') {
+        return {
+          hasConflict: true,
+          conflictReason: `Sınıf ${day} günü ${period}. ders saatinde başka bir öğretmenle ders yapıyor`
+        };
+      }
+    }
+  }
+
+  return { hasConflict: false };
+}
+
 // ENHANCED: Check if a schedule slot violates any time constraints
 export const checkConstraintViolations = (
   mode: 'teacher' | 'class',
