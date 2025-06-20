@@ -454,8 +454,9 @@ const Schedules = () => {
       if (!slot?.teacherId) return null;
       
       const teacher = teachers.find(t => t.id === slot.teacherId);
+      const subject = subjects.find(s => s.id === slot.subjectId);
       
-      return { teacher };
+      return { teacher, subject };
     }
   };
 
@@ -809,11 +810,20 @@ const Schedules = () => {
                             >
                               {slotInfo ? (
                                 <div className="text-center p-2 bg-blue-50 rounded border border-blue-200 hover:bg-blue-100 cursor-pointer transition-colors">
-                                  <div className="font-medium text-blue-900 text-sm">
-                                    {mode === 'teacher' 
-                                      ? slotInfo.classItem?.name 
-                                      : slotInfo.teacher?.name}
-                                  </div>
+                                  {mode === 'teacher' ? (
+                                    <div className="font-medium text-blue-900 text-sm">
+                                      {slotInfo.classItem?.name}
+                                    </div>
+                                  ) : (
+                                    <>
+                                      <div className="font-medium text-blue-900 text-sm">
+                                        {slotInfo.teacher?.name}
+                                      </div>
+                                      <div className="text-xs text-blue-700 mt-1">
+                                        {slotInfo.teacher?.branch || slotInfo.subject?.branch || ''}
+                                      </div>
+                                    </>
+                                  )}
                                 </div>
                               ) : (
                                 <div className="text-center p-2 bg-gray-50 rounded border border-gray-200 hover:bg-gray-100 cursor-pointer transition-colors">
