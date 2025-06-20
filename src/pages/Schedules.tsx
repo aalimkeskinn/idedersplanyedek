@@ -820,7 +820,7 @@ const Schedules = () => {
                                         {slotInfo.teacher?.name}
                                       </div>
                                       <div className="text-xs text-blue-700 mt-1">
-                                        {slotInfo.teacher?.branch || slotInfo.subject?.branch || ''}
+                                        {slotInfo.subject?.branch || ''}
                                       </div>
                                     </>
                                   )}
