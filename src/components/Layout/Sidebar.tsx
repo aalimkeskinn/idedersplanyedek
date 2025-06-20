@@ -48,18 +48,20 @@ const Sidebar = () => {
       description: 'Öğretmen bazlı görünüm'
     },
     { 
-      to: '/pdf', 
-      icon: Calendar, 
-      label: 'PDF Çıktı', 
-      color: 'ide-orange',
-      description: 'Rapor ve çıktılar'
-    },
-    { 
       to: '/data-management', 
       icon: Database, 
       label: 'Veri Yönetimi', 
       color: 'ide-primary',
       description: 'Sistem verilerini yönet'
+
+    },
+    { 
+
+      to: '/pdf', 
+      icon: Calendar, 
+      label: 'PDF Çıktı', 
+      color: 'ide-orange',
+      description: 'Rapor ve çıktılar'
     }
   ];
 
