@@ -108,6 +108,32 @@ const DataManagement = () => {
     reader.readAsText(file, 'UTF-8');
   };
 
+  const handleDownloadCSVTemplate = () => {
+    const templateContent = `öğretmen adı;branş;eğitim seviyesi;ders Adı;sınıf ve şube;haftalık saat
+"Öğretmen 1";"SINIF ÖĞRETMENLİĞİ";"İLKOKUL";"TÜRKÇE";"1A";"10"
+"Öğretmen 1";"SINIF ÖĞRETMENLİĞİ";"İLKOKUL";"MATEMATİK";"1A";"5"
+"Öğretmen 2";"SINIF ÖĞRETMENLİĞİ";"İLKOKUL";"TÜRKÇE";"1B";"10"
+"Öğretmen 3";"İNGİLİZCE";"İLKOKUL|ORTAOKUL";"İNGİLİZCE";"4A";"6"
+"Öğretmen 3";"İNGİLİZCE";"İLKOKUL|ORTAOKUL";"İNGİLİZCE";"5A";"6"
+"Öğretmen 4";"MATEMATİK|GEOMETRİ";"ORTAOKUL";"MATEMATİK";"5A";"5"
+"Öğretmen 4";"MATEMATİK|GEOMETRİ";"ORTAOKUL";"SEÇMELİ GEOMETRİ";"8A";"2"
+"Öğretmen 5";"ANAOKULU ÖĞRETMENLİĞİ";"ANAOKULU";"SINIF ÖĞRETMENİ";"Papatyalar";"15"
+"Öğretmen 6";"BEDEN EĞİTİMİ";"İLKOKUL|ORTAOKUL";"BEDEN EĞİTİMİ";"4A";"2"
+"Öğretmen 6";"BEDEN EĞİTİMİ";"İLKOKUL|ORTAOKUL";"BEDEN EĞİTİMİ";"8A";"2"
+"Öğretmen 7";"FEN BİLİMLERİ";"ORTAOKUL";"FEN BİLİMLERİ";"5A";"4"
+"Öğretmen 8";"SOSYAL BİLGİLER";"ORTAOKUL";"SOSYAL BİLGİLER";"5A";"3"
+"Öğretmen 9";"GÖRSEL SANATLAR";"ANAOKULU";"GÖRSEL";"Papatyalar";"2"
+"Öğretmen 9";"GÖRSEL SANATLAR";"İLKOKUL";"GÖRSEL";"2B";"2"
+"Öğretmen 10";"İSPANYOLCA";"ORTAOKUL";"İSPANYOLCA";"7A";"2"
+"Öğretmen 11";"ALMANCA";"ORTAOKUL";"ALMANCA";"7A";"2"
+"Öğretmen 12";"BİLİŞİM TEKNOLOJİLERİ";"ORTAOKUL";"BİLİŞİM TEKNOLOJİLERİ";"7A";"2"
+"Öğretmen 13";"REHBERLİK";"ORTAOKUL";"REHBERLİK";"8A";"1"
+"Öğretmen 14";"DİN KÜLTÜRÜ";"ORTAOKUL";"DİN KÜLTÜRÜ";"8A";"2"`;
+
+    downloadCSV(templateContent, 'kapsamli_veri_sablonu.csv');
+    success('✅ Şablon İndirildi', 'CSV şablonu başarıyla indirildi');
+  };
+
   const handleImportAllData = async () => {
     if (!parsedData) return;
     setIsImportingAll(true);
@@ -256,7 +282,7 @@ const DataManagement = () => {
             Verilen CSV dosyasını tek seferde yükleyerek tüm öğretmen, sınıf ve ders verilerini sisteme otomatik olarak ekleyin.
             Sistem verileri ayrıştıracak ve tekrar edenleri birleştirecektir.
           </p>
-          <div className="flex items-center">
+          <div className="flex items-center space-x-3">
             <input
               type="file"
               accept=".csv"
@@ -266,6 +292,7 @@ const DataManagement = () => {
               id="comprehensive-csv-upload"
             />
             <Button onClick={() => comprehensiveFileInputRef.current?.click()} icon={Upload} variant="primary">Kapsamlı CSV Yükle</Button>
+            <Button onClick={handleDownloadCSVTemplate} icon={Download} variant="secondary">Şablon İndir</Button>
           </div>
         </div>
         
@@ -313,7 +340,7 @@ const DataManagement = () => {
                   <h3 className="font-medium text-red-900">Tüm Verileri Sil</h3>
                   <p className="text-sm text-red-700 mt-1">Bu işlem tüm verileri kalıcı olarak silecektir. Bu işlem geri alınamaz!</p>
                 </div>
-                <Button onClick={() => handleDeleteAllData('all')} icon={Trash2} variant="danger" disabled={isDeletingAll || totalDataCount === 0} className="w-full sm:w-auto flex-shrink-0">
+                <Button onClick={() => handleDeleteAllData()} icon={Trash2} variant="danger" disabled={isDeletingAll || totalDataCount === 0} className="w-full sm:w-auto flex-shrink-0">
                   {isDeletingAll ? 'Siliniyor...' : `Tüm Verileri Sil (${totalDataCount})`}
                 </Button>
               </div>
