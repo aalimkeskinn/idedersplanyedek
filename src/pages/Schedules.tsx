@@ -7,7 +7,7 @@ import { useToast } from '../hooks/useToast';
 import { useConfirmation } from '../hooks/useConfirmation';
 import { useErrorModal } from '../hooks/useErrorModal';
 import { TimeConstraint } from '../types/constraints';
-import { checkSlotConflict, validateSchedule } from '../utils/scheduleValidation';
+import { checkSlotConflict, validateScheduleWithConstraints } from '../utils/scheduleValidation';
 import Button from '../components/UI/Button';
 import Select from '../components/UI/Select';
 import ScheduleSlotModal from '../components/UI/ScheduleSlotModal';
@@ -252,7 +252,7 @@ const Schedules = () => {
 
   const handleSaveSchedule = async () => {
     // Validate schedule
-    const validationResult = validateSchedule(
+    const validationResult = validateScheduleWithConstraints(
       mode,
       currentSchedule,
       mode === 'teacher' ? selectedTeacherId : selectedClassId,
