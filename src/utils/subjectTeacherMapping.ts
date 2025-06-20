@@ -7,18 +7,42 @@ import { WizardData, SubjectTeacherMapping } from '../types/wizard';
  */
 function findSuitableTeacher(subject: Subject, classItem: Class, availableTeachers: Teacher[]): Teacher | null {
   // Öncelik 1: Sınıfın kendi öğretmenlerinden (sınıf öğretmeni vb.) branşı ve seviyesi tutan
-  const primaryTeacher = availableTeachers.find(t =>
-    (classItem.teacherIds?.includes(t.id) || classItem.classTeacherId === t.id) &&
-    t.branch === subject.branch &&
-    t.level === subject.level
+  const classTeachers = availableTeachers.filter(t =>
+    (classItem.teacherIds?.includes(t.id) || classItem.classTeacherId === t.id)
   );
+  
+  // Öncelikle sınıf öğretmenlerinden branş ve seviye uyumlu olanları bul
+  const primaryTeacher = classTeachers.find(t => {
+    // Öğretmenin branşı dersin branşıyla uyumlu mu?
+    const hasBranch = t.branch === subject.branch || 
+                     (t.branches && t.branches.includes(subject.branch));
+    
+    // Öğretmenin seviyesi dersin seviyesiyle uyumlu mu?
+    const hasLevel = t.level === subject.level || 
+                    (t.levels && t.levels.includes(subject.level)) ||
+                    (subject.levels && subject.levels.includes(t.level)) ||
+                    (t.levels && subject.levels && t.levels.some(level => subject.levels.includes(level)));
+    
+    return hasBranch && hasLevel;
+  });
+  
   if (primaryTeacher) return primaryTeacher;
 
   // Öncelik 2: Diğer öğretmenler arasından branşı ve seviyesi tutan
-  const secondaryTeacher = availableTeachers.find(t =>
-    t.branch === subject.branch &&
-    t.level === subject.level
-  );
+  const secondaryTeacher = availableTeachers.find(t => {
+    // Öğretmenin branşı dersin branşıyla uyumlu mu?
+    const hasBranch = t.branch === subject.branch || 
+                     (t.branches && t.branches.includes(subject.branch));
+    
+    // Öğretmenin seviyesi dersin seviyesiyle uyumlu mu?
+    const hasLevel = t.level === subject.level || 
+                    (t.levels && t.levels.includes(subject.level)) ||
+                    (subject.levels && subject.levels.includes(t.level)) ||
+                    (t.levels && subject.levels && t.levels.some(level => subject.levels.includes(level)));
+    
+    return hasBranch && hasLevel;
+  });
+  
   if (secondaryTeacher) return secondaryTeacher;
 
   // Bulunamadıysa null döner
@@ -46,9 +70,15 @@ export function createSubjectTeacherMappings(
   // Her seçili sınıf ve ders için bir eşleştirme oluşturmaya çalış
   for (const classItem of selectedClasses) {
     for (const subject of selectedSubjects) {
-      // Sadece aynı seviyedeki dersleri işle (örn. İlkokul sınıfına lise dersi atama)
-      if (classItem.level !== subject.level) {
-        console.warn(`⚠️ Seviye uyumsuzluğu: Sınıf '${classItem.name}' (Seviye: ${classItem.level}) ile Ders '${subject.name}' (Seviye: ${subject.level}). Bu ders atlanıyor.`);
+      // Seviye uyumluluğunu kontrol et (yeni çoklu seviye desteğiyle)
+      const classLevels = classItem.levels || [classItem.level];
+      const subjectLevels = subject.levels || [subject.level];
+      
+      // Sınıf ve ders seviyelerinin kesişimi var mı?
+      const hasMatchingLevel = classLevels.some(cl => subjectLevels.includes(cl));
+      
+      if (!hasMatchingLevel) {
+        console.warn(`⚠️ Seviye uyumsuzluğu: Sınıf '${classItem.name}' (Seviye: ${classLevels.join(', ')}) ile Ders '${subject.name}' (Seviye: ${subjectLevels.join(', ')}). Bu ders atlanıyor.`);
         continue; // Bu dersi bu sınıfa atlamalıyız
       }
 

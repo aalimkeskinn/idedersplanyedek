@@ -32,7 +32,7 @@ const Subjects = () => {
   const [formData, setFormData] = useState({
     name: '',
     branch: '',
-    level: '',
+    levels: [] as ('Anaokulu' | 'İlkokul' | 'Ortaokul')[], // Multiple level selection
     weeklyHours: ''
   });
 
@@ -45,7 +45,11 @@ const Subjects = () => {
   // Filter subjects
   const getFilteredSubjects = () => {
     return subjects.filter(subject => {
-      const matchesLevel = !levelFilter || subject.level === levelFilter;
+      // Check if subject has the selected level (either in legacy level field or new levels array)
+      const matchesLevel = !levelFilter || 
+        subject.level === levelFilter || 
+        (subject.levels && subject.levels.includes(levelFilter as any));
+      
       const matchesBranch = !branchFilter || subject.branch === branchFilter;
       
       return matchesLevel && matchesBranch;
@@ -54,7 +58,7 @@ const Subjects = () => {
 
   const sortedSubjects = getFilteredSubjects().sort((a, b) => a.name.localeCompare(b.name, 'tr'));
 
-  // NEW: Delete all subjects function
+  // Delete all subjects function
   const handleDeleteAllSubjects = () => {
     if (subjects.length === 0) {
       warning('⚠️ Silinecek Ders Yok', 'Sistemde silinecek ders bulunamadı');
@@ -107,18 +111,31 @@ const Subjects = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
+    if (formData.levels.length === 0) {
+      error('❌ Eğitim Seviyesi Gerekli', 'En az bir eğitim seviyesi seçmelisiniz');
+      return;
+    }
+    
     const subjectData = {
-      ...formData,
+      name: formData.name,
+      branch: formData.branch,
+      level: formData.levels[0], // Legacy field - use first selected level
+      levels: formData.levels, // New field - array
       weeklyHours: parseInt(formData.weeklyHours)
     };
 
-    if (editingSubject) {
-      await update(editingSubject.id, subjectData);
-    } else {
-      await add(subjectData as Omit<Subject, 'id' | 'createdAt'>);
+    try {
+      if (editingSubject) {
+        await update(editingSubject.id, subjectData);
+        success('✅ Ders Güncellendi', `${formData.name} başarıyla güncellendi`);
+      } else {
+        await add(subjectData as Omit<Subject, 'id' | 'createdAt'>);
+        success('✅ Ders Eklendi', `${formData.name} başarıyla eklendi`);
+      }
+      resetForm();
+    } catch (err) {
+      error('❌ Hata', 'Ders kaydedilirken bir hata oluştu');
     }
-    
-    resetForm();
   };
 
   const handleBulkSubmit = async (e: React.FormEvent) => {
@@ -131,6 +148,7 @@ const Subjects = () => {
             name: subject.name,
             branch: subject.branch,
             level: subject.level as Subject['level'],
+            levels: [subject.level as 'Anaokulu' | 'İlkokul' | 'Ortaokul'],
             weeklyHours: parseInt(subject.weeklyHours)
           } as Omit<Subject, 'id' | 'createdAt'>);
         }
@@ -139,19 +157,23 @@ const Subjects = () => {
     
     setBulkSubjects([{ name: '', branch: '', level: '', weeklyHours: '' }]);
     setIsBulkModalOpen(false);
+    success('✅ Dersler Eklendi', `${bulkSubjects.filter(s => s.name && s.branch && s.level && s.weeklyHours).length} ders başarıyla eklendi`);
   };
 
   const resetForm = () => {
-    setFormData({ name: '', branch: '', level: '', weeklyHours: '' });
+    setFormData({ name: '', branch: '', levels: [], weeklyHours: '' });
     setEditingSubject(null);
     setIsModalOpen(false);
   };
 
   const handleEdit = (subject: Subject) => {
+    // Initialize form data with both legacy and new fields
+    const levelsArray = subject.levels || [subject.level];
+    
     setFormData({
       name: subject.name,
       branch: subject.branch,
-      level: subject.level,
+      levels: levelsArray,
       weeklyHours: subject.weeklyHours.toString()
     });
     setEditingSubject(subject);
@@ -171,6 +193,24 @@ const Subjects = () => {
     }
   };
 
+  // Handle level selection/deselection
+  const handleLevelToggle = (level: 'Anaokulu' | 'İlkokul' | 'Ortaokul') => {
+    setFormData(prev => {
+      const isSelected = prev.levels.includes(level);
+      if (isSelected) {
+        return {
+          ...prev,
+          levels: prev.levels.filter(l => l !== level)
+        };
+      } else {
+        return {
+          ...prev,
+          levels: [...prev.levels, level]
+        };
+      }
+    });
+  };
+
   const addBulkRow = () => {
     setBulkSubjects([...bulkSubjects, { name: '', branch: '', level: '', weeklyHours: '' }]);
   };
@@ -185,6 +225,14 @@ const Subjects = () => {
     const updated = [...bulkSubjects];
     updated[index] = { ...updated[index], [field]: value };
     setBulkSubjects(updated);
+  };
+
+  // Get display text for subject levels
+  const getSubjectLevelsDisplay = (subject: Subject): string[] => {
+    if (subject.levels && subject.levels.length > 0) {
+      return subject.levels;
+    }
+    return [subject.level];
   };
 
   const levelOptions = EDUCATION_LEVELS.map(level => ({
@@ -343,13 +391,17 @@ const Subjects = () => {
                       <div className="text-sm text-gray-500">{subject.branch}</div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
-                      <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
-                        subject.level === 'Anaokulu' ? 'bg-green-100 text-green-800' :
-                        subject.level === 'İlkokul' ? 'bg-blue-100 text-blue-800' :
-                        'bg-purple-100 text-purple-800'
-                      }`}>
-                        {subject.level}
-                      </span>
+                      <div className="flex flex-wrap gap-1">
+                        {getSubjectLevelsDisplay(subject).map((level, index) => (
+                          <span key={index} className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
+                            level === 'Anaokulu' ? 'bg-green-100 text-green-800' :
+                            level === 'İlkokul' ? 'bg-blue-100 text-blue-800' :
+                            'bg-purple-100 text-purple-800'
+                          }`}>
+                            {level}
+                          </span>
+                        ))}
+                      </div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="text-sm text-gray-900">{subject.weeklyHours} saat</div>
@@ -382,7 +434,7 @@ const Subjects = () => {
         </div>
       )}
 
-      {/* Single Subject Modal */}
+      {/* Subject Modal with Multiple Level Selection */}
       <Modal
         isOpen={isModalOpen}
         onClose={resetForm}
@@ -405,13 +457,41 @@ const Subjects = () => {
             required
           />
           
-          <Select
-            label="Eğitim Seviyesi"
-            value={formData.level}
-            onChange={(value) => setFormData({ ...formData, level: value })}
-            options={levelOptions}
-            required
-          />
+          {/* Multiple Level Selection */}
+          <div className="mb-4">
+            <label className="block text-sm font-semibold text-gray-800 mb-2">
+              Eğitim Seviyeleri <span className="text-red-500">*</span>
+            </label>
+            <div className="flex flex-wrap gap-3">
+              {EDUCATION_LEVELS.map((level) => (
+                <label 
+                  key={level} 
+                  className={`
+                    flex items-center p-3 border-2 rounded-lg cursor-pointer transition-all
+                    ${formData.levels.includes(level) 
+                      ? 'bg-indigo-50 border-indigo-500 text-indigo-700' 
+                      : 'bg-white border-gray-300 text-gray-700 hover:bg-gray-50'}
+                  `}
+                >
+                  <input
+                    type="checkbox"
+                    checked={formData.levels.includes(level)}
+                    onChange={() => handleLevelToggle(level)}
+                    className="sr-only" // Hide the checkbox visually
+                  />
+                  <span className="text-sm font-medium">{level}</span>
+                  {formData.levels.includes(level) && (
+                    <span className="ml-2 text-indigo-600">✓</span>
+                  )}
+                </label>
+              ))}
+            </div>
+            {formData.levels.length > 0 && (
+              <p className="text-xs text-indigo-600 mt-2">
+                ✨ Seçilen seviyeler: {formData.levels.join(', ')}
+              </p>
+            )}
+          </div>
 
           <Input
             label="Haftalık Ders Saati"
@@ -433,6 +513,7 @@ const Subjects = () => {
             <Button
               type="submit"
               variant="primary"
+              disabled={formData.levels.length === 0}
             >
               {editingSubject ? 'Güncelle' : 'Kaydet'}
             </Button>

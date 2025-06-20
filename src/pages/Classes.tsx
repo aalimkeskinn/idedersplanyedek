@@ -34,7 +34,7 @@ const Classes = () => {
   ]);
   const [formData, setFormData] = useState({
     name: '',
-    level: '',
+    levels: [] as ('Anaokulu' | 'İlkokul' | 'Ortaokul')[], // Multiple level selection
     teacherIds: [] as string[],
     classTeacherId: ''
   });
@@ -76,14 +76,18 @@ const Classes = () => {
   // Filter classes
   const getFilteredClasses = () => {
     return classes.filter(classItem => {
-      const matchesLevel = !levelFilter || classItem.level === levelFilter;
+      // Check if class has the selected level (either in legacy level field or new levels array)
+      const matchesLevel = !levelFilter || 
+        classItem.level === levelFilter || 
+        (classItem.levels && classItem.levels.includes(levelFilter as any));
+      
       return matchesLevel;
     });
   };
 
   const sortedClasses = getFilteredClasses().sort((a, b) => a.name.localeCompare(b.name, 'tr'));
 
-  // NEW: Delete all classes function
+  // Delete all classes function
   const handleDeleteAllClasses = () => {
     if (classes.length === 0) {
       warning('⚠️ Silinecek Sınıf Yok', 'Sistemde silinecek sınıf bulunamadı');
@@ -135,22 +139,32 @@ const Classes = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
+    if (formData.levels.length === 0) {
+      error('❌ Eğitim Seviyesi Gerekli', 'En az bir eğitim seviyesi seçmelisiniz');
+      return;
+    }
+    
     const classData = {
       name: formData.name,
-      level: formData.level,
+      level: formData.levels[0], // Legacy field - use first selected level
+      levels: formData.levels, // New field - array
       teacherIds: formData.teacherIds,
       classTeacherId: formData.classTeacherId
     };
     
-    if (editingClass) {
-      await update(editingClass.id, classData);
-      success('✅ Sınıf Güncellendi', `${formData.name} sınıfı başarıyla güncellendi`);
-    } else {
-      await add(classData as Omit<Class, 'id' | 'createdAt'>);
-      success('✅ Sınıf Eklendi', `${formData.name} sınıfı başarıyla eklendi`);
+    try {
+      if (editingClass) {
+        await update(editingClass.id, classData);
+        success('✅ Sınıf Güncellendi', `${formData.name} sınıfı başarıyla güncellendi`);
+      } else {
+        await add(classData as Omit<Class, 'id' | 'createdAt'>);
+        success('✅ Sınıf Eklendi', `${formData.name} sınıfı başarıyla eklendi`);
+      }
+      
+      resetForm();
+    } catch (err) {
+      error('❌ Hata', 'Sınıf kaydedilirken bir hata oluştu');
     }
-    
-    resetForm();
   };
 
   const handleBulkSubmit = async (e: React.FormEvent) => {
@@ -162,6 +176,7 @@ const Classes = () => {
           await add({
             name: classItem.name,
             level: classItem.level as Class['level'],
+            levels: [classItem.level as 'Anaokulu' | 'İlkokul' | 'Ortaokul'],
             teacherIds: []
           } as Omit<Class, 'id' | 'createdAt'>);
         }
@@ -176,7 +191,7 @@ const Classes = () => {
   const resetForm = () => {
     setFormData({ 
       name: '', 
-      level: '', 
+      levels: [], 
       teacherIds: [],
       classTeacherId: ''
     });
@@ -185,9 +200,12 @@ const Classes = () => {
   };
 
   const handleEdit = (classItem: Class) => {
+    // Initialize form data with both legacy and new fields
+    const levelsArray = classItem.levels || [classItem.level];
+    
     setFormData({
       name: classItem.name,
-      level: classItem.level,
+      levels: levelsArray,
       teacherIds: classItem.teacherIds || [],
       classTeacherId: classItem.classTeacherId || ''
     });
@@ -266,12 +284,36 @@ const Classes = () => {
     });
   };
 
-  // Filtrelenmiş öğretmen listesi - sınıf seviyesine göre
+  // Handle level selection/deselection
+  const handleLevelToggle = (level: 'Anaokulu' | 'İlkokul' | 'Ortaokul') => {
+    setFormData(prev => {
+      const isSelected = prev.levels.includes(level);
+      if (isSelected) {
+        return {
+          ...prev,
+          levels: prev.levels.filter(l => l !== level)
+        };
+      } else {
+        return {
+          ...prev,
+          levels: [...prev.levels, level]
+        };
+      }
+    });
+  };
+
+  // Filtrelenmiş öğretmen listesi - sınıf seviyelerine göre
   const getFilteredTeachers = () => {
-    if (!formData.level) return [];
+    if (formData.levels.length === 0) return [];
     
     return teachers
-      .filter(teacher => teacher.level === formData.level)
+      .filter(teacher => {
+        // Check if teacher has at least one level that matches class levels
+        return formData.levels.some(level => 
+          teacher.level === level || 
+          (teacher.levels && teacher.levels.includes(level))
+        );
+      })
       .sort((a, b) => a.name.localeCompare(b.name, 'tr'));
   };
 
@@ -288,6 +330,14 @@ const Classes = () => {
     
     const classTeachers = teachers.filter(t => teacherIds.includes(t.id));
     return classTeachers.map(t => t.name).join(', ');
+  };
+
+  // Get display text for class levels
+  const getClassLevelsDisplay = (classItem: Class): string[] => {
+    if (classItem.levels && classItem.levels.length > 0) {
+      return classItem.levels;
+    }
+    return [classItem.level];
   };
 
   const levelOptions = EDUCATION_LEVELS.map(level => ({
@@ -404,18 +454,23 @@ const Classes = () => {
             const weeklyHours = getWeeklyHours(classItem.id);
             const classTeacherName = getClassTeacherName(classItem.classTeacherId);
             const classTeacherNames = getClassTeacherNames(classItem.teacherIds);
+            const classLevels = getClassLevelsDisplay(classItem);
             
             return (
               <div key={classItem.id} className="mobile-card mobile-spacing hover:shadow-md transition-shadow">
                 <div className="flex items-center justify-between mb-4">
                   <h3 className="text-lg font-semibold text-gray-900">{classItem.name}</h3>
-                  <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
-                    classItem.level === 'Anaokulu' ? 'bg-green-100 text-green-800' :
-                    classItem.level === 'İlkokul' ? 'bg-blue-100 text-blue-800' :
-                    'bg-purple-100 text-purple-800'
-                  }`}>
-                    {classItem.level}
-                  </span>
+                  <div className="flex flex-wrap gap-1">
+                    {classLevels.map((level, index) => (
+                      <span key={index} className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
+                        level === 'Anaokulu' ? 'bg-green-100 text-green-800' :
+                        level === 'İlkokul' ? 'bg-blue-100 text-blue-800' :
+                        'bg-purple-100 text-purple-800'
+                      }`}>
+                        {level}
+                      </span>
+                    ))}
+                  </div>
                 </div>
                 
                 {/* Öğretmen Bilgisi */}
@@ -426,7 +481,7 @@ const Classes = () => {
                       <div>
                         {classTeacherName && (
                           <p className="text-sm font-medium text-blue-700">
-                            <span className="font-bold">Sınıf Öğretmeni:</span> {classTeacherName}
+                            <span className="font-bold">Sınıf öğretmeni:</span> {classTeacherName}
                           </p>
                         )}
                         {classTeacherNames && (
@@ -525,18 +580,46 @@ const Classes = () => {
                   required
                 />
                 
-                <Select
-                  label="Eğitim Seviyesi"
-                  value={formData.level}
-                  onChange={(value) => setFormData({ ...formData, level: value })}
-                  options={levelOptions}
-                  required
-                />
+                {/* Multiple Level Selection */}
+                <div className="mb-4">
+                  <label className="block text-sm font-semibold text-gray-800 mb-2">
+                    Eğitim Seviyeleri <span className="text-red-500">*</span>
+                  </label>
+                  <div className="flex flex-wrap gap-3">
+                    {EDUCATION_LEVELS.map((level) => (
+                      <label 
+                        key={level} 
+                        className={`
+                          flex items-center p-3 border-2 rounded-lg cursor-pointer transition-all
+                          ${formData.levels.includes(level) 
+                            ? 'bg-emerald-50 border-emerald-500 text-emerald-700' 
+                            : 'bg-white border-gray-300 text-gray-700 hover:bg-gray-50'}
+                        `}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={formData.levels.includes(level)}
+                          onChange={() => handleLevelToggle(level)}
+                          className="sr-only" // Hide the checkbox visually
+                        />
+                        <span className="text-sm font-medium">{level}</span>
+                        {formData.levels.includes(level) && (
+                          <span className="ml-2 text-emerald-600">✓</span>
+                        )}
+                      </label>
+                    ))}
+                  </div>
+                  {formData.levels.length > 0 && (
+                    <p className="text-xs text-emerald-600 mt-2">
+                      ✨ Seçilen seviyeler: {formData.levels.join(', ')}
+                    </p>
+                  )}
+                </div>
               </div>
             </div>
             
             {/* Öğretmen Seçimi - Sadece seviye seçildiğinde göster */}
-            {formData.level && (
+            {formData.levels.length > 0 && (
               <div>
                 <h3 className="text-lg font-medium text-gray-900 mb-4 flex items-center">
                   <Users className="w-5 h-5 mr-2 text-blue-600" />
@@ -547,10 +630,10 @@ const Classes = () => {
                   <div className="text-center py-6 bg-gray-50 rounded-lg">
                     <Users className="w-12 h-12 text-gray-300 mx-auto mb-3" />
                     <p className="text-gray-500">
-                      {formData.level} seviyesinde öğretmen bulunamadı
+                      Seçilen seviyelerde öğretmen bulunamadı
                     </p>
                     <p className="text-sm text-gray-400 mt-1">
-                      Önce öğretmen ekleyin veya farklı bir seviye seçin
+                      Önce öğretmen ekleyin veya farklı seviyeler seçin
                     </p>
                   </div>
                 ) : (
@@ -655,6 +738,7 @@ const Classes = () => {
             <Button
               type="submit"
               variant="primary"
+              disabled={formData.levels.length === 0}
             >
               {editingClass ? 'Güncelle' : 'Kaydet'}
             </Button>

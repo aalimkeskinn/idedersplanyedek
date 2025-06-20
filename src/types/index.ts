@@ -3,15 +3,18 @@
 export interface Teacher {
   id: string;
   name: string;
-  branch: string;
-  level: 'Anaokulu' | 'İlkokul' | 'Ortaokul';
+  branch: string; // Will be used as comma-separated string for backward compatibility
+  branches?: string[]; // New field for multiple branches
+  level: 'Anaokulu' | 'İlkokul' | 'Ortaokul'; // For backward compatibility
+  levels?: ('Anaokulu' | 'İlkokul' | 'Ortaokul')[]; // New field for multiple levels
   createdAt: Date;
 }
 
 export interface Class {
   id: string;
   name: string;
-  level: 'Anaokulu' | 'İlkokul' | 'Ortaokul';
+  level: 'Anaokulu' | 'İlkokul' | 'Ortaokul'; // For backward compatibility
+  levels?: ('Anaokulu' | 'İlkokul' | 'Ortaokul')[]; // New field for multiple levels
   createdAt: Date;
   teacherIds?: string[]; // Birden fazla öğretmen ID'si
   classTeacherId?: string; // Sınıf öğretmeni ID'si (opsiyonel)
@@ -21,7 +24,8 @@ export interface Subject {
   id: string;
   name: string;
   branch: string;
-  level: 'Anaokulu' | 'İlkokul' | 'Ortaokul';
+  level: 'Anaokulu' | 'İlkokul' | 'Ortaokul'; // For backward compatibility
+  levels?: ('Anaokulu' | 'İlkokul' | 'Ortaokul')[]; // New field for multiple levels
   weeklyHours: number;
   createdAt: Date;
 }

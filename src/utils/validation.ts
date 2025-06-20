@@ -63,9 +63,16 @@ export const validateTeacher = (teacher: Partial<Teacher>): string[] => {
     errors.push(VALIDATION_ERRORS.MIN_LENGTH('Branş', 2));
   }
   
-  // Validate level
+  // Validate level - now supporting multiple levels
   const validLevels = ['Anaokulu', 'İlkokul', 'Ortaokul'];
-  if (!teacher.level || !validLevels.includes(teacher.level)) {
+  
+  if (teacher.levels && teacher.levels.length > 0) {
+    // Check if all levels are valid
+    const invalidLevels = teacher.levels.filter(level => !validLevels.includes(level));
+    if (invalidLevels.length > 0) {
+      errors.push(`Geçersiz seviye(ler): ${invalidLevels.join(', ')}`);
+    }
+  } else if (!teacher.level || !validLevels.includes(teacher.level)) {
     errors.push(VALIDATION_ERRORS.INVALID_SELECTION('seviye'));
   }
   
@@ -93,9 +100,16 @@ export const validateClass = (classItem: Partial<Class>): string[] => {
     errors.push('Geçersiz karakter tespit edildi');
   }
   
-  // Validate level
+  // Validate level - now supporting multiple levels
   const validLevels = ['Anaokulu', 'İlkokul', 'Ortaokul'];
-  if (!classItem.level || !validLevels.includes(classItem.level)) {
+  
+  if (classItem.levels && classItem.levels.length > 0) {
+    // Check if all levels are valid
+    const invalidLevels = classItem.levels.filter(level => !validLevels.includes(level));
+    if (invalidLevels.length > 0) {
+      errors.push(`Geçersiz seviye(ler): ${invalidLevels.join(', ')}`);
+    }
+  } else if (!classItem.level || !validLevels.includes(classItem.level)) {
     errors.push(VALIDATION_ERRORS.INVALID_SELECTION('seviye'));
   }
   
@@ -127,6 +141,19 @@ export const validateSubject = (subject: Partial<Subject>): string[] => {
   // Validate weekly hours
   if (!subject.weeklyHours || subject.weeklyHours < 1 || subject.weeklyHours > 45) {
     errors.push('Haftalık ders saati 1-45 arasında olmalıdır');
+  }
+  
+  // Validate level - now supporting multiple levels
+  const validLevels = ['Anaokulu', 'İlkokul', 'Ortaokul'];
+  
+  if (subject.levels && subject.levels.length > 0) {
+    // Check if all levels are valid
+    const invalidLevels = subject.levels.filter(level => !validLevels.includes(level));
+    if (invalidLevels.length > 0) {
+      errors.push(`Geçersiz seviye(ler): ${invalidLevels.join(', ')}`);
+    }
+  } else if (!subject.level || !validLevels.includes(subject.level)) {
+    errors.push(VALIDATION_ERRORS.INVALID_SELECTION('seviye'));
   }
   
   // Check for suspicious patterns
@@ -410,9 +437,15 @@ const checkCompatibility = (
     const classItem = classes.find(c => c.id === slot.classId);
 
     if (teacher && classItem) {
-      // Check level compatibility
-      if (teacher.level !== classItem.level) {
-        warnings.push(`${teacher.name} (${teacher.level}) ile ${classItem.name} (${classItem.level}) seviye uyumsuzluğu`);
+      // Check level compatibility with support for multiple levels
+      const teacherLevels = teacher.levels || [teacher.level];
+      const classLevels = classItem.levels || [classItem.level];
+      
+      // Check if there's any overlap between teacher levels and class levels
+      const hasMatchingLevel = teacherLevels.some(tl => classLevels.includes(tl));
+      
+      if (!hasMatchingLevel) {
+        warnings.push(`${teacher.name} (${teacherLevels.join(', ')}) ile ${classItem.name} (${classLevels.join(', ')}) seviye uyumsuzluğu`);
       }
     }
   }
@@ -422,9 +455,23 @@ const checkCompatibility = (
     const subject = subjects.find(s => s.id === slot.subjectId);
 
     if (teacher && subject) {
-      // Check branch compatibility
-      if (teacher.branch !== subject.branch) {
-        warnings.push(`${teacher.name} (${teacher.branch}) ile ${subject.name} (${subject.branch}) branş uyumsuzluğu`);
+      // Check branch compatibility with support for multiple branches
+      const teacherBranches = teacher.branches || [teacher.branch];
+      const hasBranch = teacherBranches.some(tb => tb === subject.branch || tb.includes(subject.branch));
+      
+      if (!hasBranch) {
+        warnings.push(`${teacher.name} (${teacherBranches.join(', ')}) ile ${subject.name} (${subject.branch}) branş uyumsuzluğu`);
+      }
+      
+      // Check level compatibility with support for multiple levels
+      const teacherLevels = teacher.levels || [teacher.level];
+      const subjectLevels = subject.levels || [subject.level];
+      
+      // Check if there's any overlap between teacher levels and subject levels
+      const hasMatchingLevel = teacherLevels.some(tl => subjectLevels.includes(tl));
+      
+      if (!hasMatchingLevel) {
+        warnings.push(`${teacher.name} (${teacherLevels.join(', ')}) ile ${subject.name} (${subjectLevels.join(', ')}) seviye uyumsuzluğu`);
       }
     }
   }
