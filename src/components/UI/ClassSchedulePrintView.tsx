@@ -134,7 +134,7 @@ const ClassSchedulePrintView: React.FC<ClassSchedulePrintViewProps> = ({
 
                   // Öğretmeni ve dersi güvenli bir şekilde bul
                   const teacher = teachers.find(t => t.id === slot.teacher?.id);
-                  const subject = getSubjectForTeacher(teacher as Teacher);
+                  const subject = slot.subject;
 
                   return (
                     <td key={`${day}-${period}`} style={{ border: '1px solid #000000', padding: '8px 4px', textAlign: 'center' }}>
@@ -145,7 +145,7 @@ const ClassSchedulePrintView: React.FC<ClassSchedulePrintViewProps> = ({
                           </div>
                           <div style={{ fontSize: '9px', color: '#666666' }}>
                             {/* Dersi güvenli bir şekilde göster, bulunamazsa branşı göster */}
-                            {subject?.name || teacher.branch}
+                            {subject?.branch || ''}
                           </div>
                         </div>
                       ) : (
