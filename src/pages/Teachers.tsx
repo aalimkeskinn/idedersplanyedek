@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Plus, Edit, Trash2, Users, Search, X, BookOpen } from 'lucide-react';
 import { Teacher, EDUCATION_LEVELS, Subject } from '../types';
 import { useFirestore } from '../hooks/useFirestore';
@@ -38,6 +38,30 @@ const Teachers = () => {
     levels: [] as ('Anaokulu' | 'İlkokul' | 'Ortaokul')[],
     subjectIds: [] as string[],
   });
+
+  // KRİTİK İYİLEŞTİRME: Seçilen seviyeler değiştiğinde, seçili dersleri de güncelle.
+  // Bu, kullanıcı bir seviyeyi kaldırdığında, o seviyeye ait derslerin seçiminin de kaldırılmasını sağlar.
+  useEffect(() => {
+    if (formData.subjectIds.length > 0) {
+      const stillValidSubjectIds = formData.subjectIds.filter(subjectId => {
+        const subject = subjects.find(s => s.id === subjectId);
+        if (!subject) return false; // Ders silinmiş olabilir
+
+        const subjectLevels = subject.levels || [subject.level];
+        // Bu dersin seviyelerinden en az biri, öğretmenin yeni seviye listesinde hala var mı?
+        return subjectLevels.some(sl => formData.levels.includes(sl));
+      });
+
+      // Eğer geçerli ders listesi eskisinden kısaysa, state'i güncelle
+      if (stillValidSubjectIds.length < formData.subjectIds.length) {
+        setFormData(prev => ({
+          ...prev,
+          subjectIds: stillValidSubjectIds
+        }));
+      }
+    }
+  }, [formData.levels, subjects, formData.subjectIds]);
+
 
   const getUniqueBranches = () => {
     const branches = [...new Set(subjects.map(subject => subject.branch))];
@@ -201,6 +225,16 @@ const Teachers = () => {
   const getTeacherBranchesDisplay = (teacher: Teacher) => teacher.branch;
   const getTeacherLevelsDisplay = (teacher: Teacher) => teacher.levels || [teacher.level];
 
+  // DERSLER LİSTESİNİ FİLTRELEME MANTIĞI
+  const filteredSubjectsForModal = subjects.filter(subject => {
+    if (formData.levels.length === 0) {
+      return false; // Öğretmen için seviye seçilmediyse hiçbir dersi gösterme
+    }
+    const subjectLevels = subject.levels || [subject.level];
+    // Dersin seviyelerinden en az biri, öğretmenin seçili seviyelerinden biriyle eşleşmeli
+    return subjectLevels.some(sl => formData.levels.includes(sl));
+  }).sort((a, b) => a.name.localeCompare(b.name, 'tr'));
+
   const levelOptions = EDUCATION_LEVELS.map(level => ({ value: level, label: level }));
   const branchOptions = [{ value: '', label: 'Branş Seçin...' }, ...getUniqueBranches().map(branch => ({ value: branch, label: branch }))];
   const levelFilterOptions = [{ value: '', label: 'Tüm Seviyeler' }, ...levelOptions];
@@ -248,12 +282,20 @@ const Teachers = () => {
           <div className="mt-6 pt-6 border-t border-gray-200">
             <h3 className="text-lg font-medium text-gray-900 mb-4 flex items-center"><BookOpen className="w-5 h-5 mr-2 text-indigo-600" />Dersler</h3>
             <div className="space-y-2 p-3 border border-gray-300 rounded-lg bg-gray-50 max-h-60 overflow-y-auto">
-              {subjects.sort((a, b) => a.name.localeCompare(b.name, 'tr')).map((subject) => (
+              {/* DERS LİSTESİ FİLTRELENMİŞ HALİYLE KULLANILIYOR */}
+              {filteredSubjectsForModal.map((subject) => (
                 <label key={subject.id} className="flex items-center space-x-3 cursor-pointer p-2 hover:bg-gray-100 rounded-md">
                   <input type="checkbox" checked={formData.subjectIds.includes(subject.id)} onChange={() => handleSubjectToggle(subject.id)} className="w-4 h-4 text-indigo-600 bg-gray-100 border-gray-300 rounded focus:ring-indigo-500" />
                   <span className="text-sm font-medium text-gray-700">{subject.name}<span className="text-xs text-gray-500 ml-2">({subject.branch} - {(subject.levels || [subject.level]).join(', ')})</span></span>
                 </label>
               ))}
+              {/* Seviye seçilmediğinde veya uygun ders olmadığında gösterilecek mesaj */}
+              {formData.levels.length > 0 && filteredSubjectsForModal.length === 0 && (
+                <div className="text-center text-sm text-gray-500 py-4">Seçilen seviyelere uygun ders bulunamadı.</div>
+              )}
+              {formData.levels.length === 0 && (
+                <div className="text-center text-sm text-gray-500 py-4">Dersleri görmek için lütfen önce eğitim seviyesi seçin.</div>
+              )}
             </div>
             {formData.subjectIds.length > 0 && (<p className="text-xs text-indigo-600 mt-2">✨ {formData.subjectIds.length} ders seçildi.</p>)}
           </div>
