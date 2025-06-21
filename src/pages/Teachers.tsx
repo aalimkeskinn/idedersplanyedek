@@ -33,8 +33,9 @@ const Teachers = () => {
   ]);
   const [formData, setFormData] = useState({
     name: '',
-    branches: [] as string[], // Multiple branch selection
+    branch: '', // Single branch selection
     levels: [] as ('Anaokulu' | 'İlkokul' | 'Ortaokul')[], // Multiple level selection
+    selectedSubjects: [] as string[], // Multiple subject selection
   });
 
   // Get unique branches from subjects
@@ -118,12 +119,12 @@ const Teachers = () => {
     );
   };
 
-  // Handle form submission with multiple branches and levels
+  // Handle form submission with single branch and multiple levels
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (formData.branches.length === 0) {
-      error('❌ Branş Seçimi Gerekli', 'En az bir branş seçmelisiniz');
+    if (!formData.branch) {
+      error('❌ Branş Seçimi Gerekli', 'Bir branş seçmelisiniz');
       return;
     }
 
@@ -136,10 +137,10 @@ const Teachers = () => {
       // Create teacher data with both legacy and new fields
       const teacherData = {
         name: formData.name,
-        branch: formData.branches.join(', '), // Legacy field - join with comma
-        branches: formData.branches, // New field - array
+        branch: formData.branch, // Single branch
         level: formData.levels[0], // Legacy field - use first selected level
         levels: formData.levels, // New field - array
+        selectedSubjects: formData.selectedSubjects, // Store selected subjects
       };
 
       if (editingTeacher) {
@@ -165,8 +166,8 @@ const Teachers = () => {
             name: teacher.name,
             branch: teacher.branch,
             level: teacher.level as Teacher['level'],
-            branches: [teacher.branch],
-            levels: [teacher.level as 'Anaokulu' | 'İlkokul' | 'Ortaokul']
+            levels: [teacher.level as 'Anaokulu' | 'İlkokul' | 'Ortaokul'],
+            selectedSubjects: []
           } as Omit<Teacher, 'id' | 'createdAt'>);
         }
       }
@@ -178,23 +179,25 @@ const Teachers = () => {
   };
 
   const resetForm = () => {
-    setFormData({ name: '', branches: [], levels: [] });
+    setFormData({ 
+      name: '', 
+      branch: '', 
+      levels: [],
+      selectedSubjects: []
+    });
     setEditingTeacher(null);
     setIsModalOpen(false);
   };
 
   const handleEdit = (teacher: Teacher) => {
     // Initialize form data with both legacy and new fields
-    const branchesArray = teacher.branches || 
-                         teacher.branch.split(', ').map(b => b.trim());
-    
-    const levelsArray = teacher.levels || 
-                       [teacher.level];
+    const levelsArray = teacher.levels || [teacher.level];
     
     setFormData({
       name: teacher.name,
-      branches: branchesArray,
+      branch: teacher.branch,
       levels: levelsArray,
+      selectedSubjects: teacher.selectedSubjects || []
     });
     setEditingTeacher(teacher);
     setIsModalOpen(true);
@@ -213,24 +216,6 @@ const Teachers = () => {
     }
   };
 
-  // Handle branch selection/deselection
-  const handleBranchToggle = (branch: string) => {
-    setFormData(prev => {
-      const isSelected = prev.branches.includes(branch);
-      if (isSelected) {
-        return {
-          ...prev,
-          branches: prev.branches.filter(b => b !== branch)
-        };
-      } else {
-        return {
-          ...prev,
-          branches: [...prev.branches, branch]
-        };
-      }
-    });
-  };
-
   // Handle level selection/deselection
   const handleLevelToggle = (level: 'Anaokulu' | 'İlkokul' | 'Ortaokul') => {
     setFormData(prev => {
@@ -244,6 +229,24 @@ const Teachers = () => {
         return {
           ...prev,
           levels: [...prev.levels, level]
+        };
+      }
+    });
+  };
+
+  // Handle subject selection/deselection
+  const handleSubjectToggle = (subjectId: string) => {
+    setFormData(prev => {
+      const isSelected = prev.selectedSubjects.includes(subjectId);
+      if (isSelected) {
+        return {
+          ...prev,
+          selectedSubjects: prev.selectedSubjects.filter(id => id !== subjectId)
+        };
+      } else {
+        return {
+          ...prev,
+          selectedSubjects: [...prev.selectedSubjects, subjectId]
         };
       }
     });
@@ -285,19 +288,30 @@ const Teachers = () => {
     }
   };
 
-  // Get display text for teacher branches and levels
-  const getTeacherBranchesDisplay = (teacher: Teacher): string => {
-    if (teacher.branches && teacher.branches.length > 0) {
-      return teacher.branches.join(', ');
-    }
-    return teacher.branch;
-  };
-
+  // Get display text for teacher levels
   const getTeacherLevelsDisplay = (teacher: Teacher): string[] => {
     if (teacher.levels && teacher.levels.length > 0) {
       return teacher.levels;
     }
     return [teacher.level];
+  };
+
+  // Get filtered subjects based on selected branch and levels
+  const getFilteredSubjects = () => {
+    if (!formData.branch || formData.levels.length === 0) return [];
+    
+    return subjects.filter(subject => {
+      // Check if subject branch matches teacher branch
+      const matchesBranch = subject.branch === formData.branch;
+      
+      // Check if subject level matches any of teacher levels
+      const subjectLevels = subject.levels || [subject.level];
+      const hasMatchingLevel = formData.levels.some(level => 
+        subjectLevels.includes(level)
+      );
+      
+      return matchesBranch && hasMatchingLevel;
+    });
   };
 
   const levelOptions = EDUCATION_LEVELS.map(level => ({
@@ -502,7 +516,7 @@ const Teachers = () => {
                 </div>
                 <div className="mobile-table-card-row">
                   <span className="mobile-table-card-label">Branş</span>
-                  <span className="mobile-table-card-value">{getTeacherBranchesDisplay(teacher)}</span>
+                  <span className="mobile-table-card-value">{teacher.branch}</span>
                 </div>
                 <div className="mobile-table-card-row">
                   <span className="mobile-table-card-label">Seviye</span>
@@ -570,7 +584,7 @@ const Teachers = () => {
                         <div className="text-sm font-medium text-gray-900">{teacher.name}</div>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="text-sm text-gray-500">{getTeacherBranchesDisplay(teacher)}</div>
+                        <div className="text-sm text-gray-500">{teacher.branch}</div>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
                         <div className="flex flex-wrap gap-1">
@@ -614,7 +628,7 @@ const Teachers = () => {
         </>
       )}
 
-      {/* Teacher Modal with Multiple Branch and Level Selection */}
+      {/* Teacher Modal with Single Branch and Multiple Subject Selection */}
       <Modal
         isOpen={isModalOpen}
         onClose={resetForm}
@@ -629,29 +643,22 @@ const Teachers = () => {
             required
           />
           
-          {/* Multiple Branch Selection */}
+          {/* Single Branch Selection */}
           <div className="mb-4">
             <label className="block text-sm font-semibold text-gray-800 mb-2">
-              Branşlar <span className="text-red-500">*</span>
+              Branş <span className="text-red-500">*</span>
             </label>
-            <div className="space-y-2 p-3 border border-gray-300 rounded-lg bg-gray-50 max-h-60 overflow-y-auto">
-              {branchOptions.map((branch) => (
-                <label key={branch.value} className="flex items-center space-x-3 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={formData.branches.includes(branch.value)}
-                    onChange={() => handleBranchToggle(branch.value)}
-                    className="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500"
-                  />
-                  <span className="text-sm font-medium text-gray-700">{branch.label}</span>
-                </label>
+            <select
+              value={formData.branch}
+              onChange={(e) => setFormData({ ...formData, branch: e.target.value })}
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              required
+            >
+              <option value="">Branş Seçin</option>
+              {branchOptions.map(branch => (
+                <option key={branch.value} value={branch.value}>{branch.label}</option>
               ))}
-            </div>
-            {formData.branches.length > 0 && (
-              <p className="text-xs text-blue-600 mt-1">
-                ✨ Seçilen branşlar: {formData.branches.join(', ')}
-              </p>
-            )}
+            </select>
           </div>
           
           {/* Multiple Level Selection */}
@@ -690,6 +697,40 @@ const Teachers = () => {
             )}
           </div>
 
+          {/* Multiple Subject Selection - Only show if branch and levels are selected */}
+          {formData.branch && formData.levels.length > 0 && (
+            <div className="mb-4">
+              <label className="block text-sm font-semibold text-gray-800 mb-2">
+                Verebileceği Dersler
+              </label>
+              <div className="space-y-2 p-3 border border-gray-300 rounded-lg bg-gray-50 max-h-60 overflow-y-auto">
+                {getFilteredSubjects().length > 0 ? (
+                  getFilteredSubjects().map((subject) => (
+                    <label key={subject.id} className="flex items-center space-x-3 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={formData.selectedSubjects.includes(subject.id)}
+                        onChange={() => handleSubjectToggle(subject.id)}
+                        className="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500"
+                      />
+                      <span className="text-sm font-medium text-gray-700">{subject.name}</span>
+                      <span className="text-xs text-gray-500">({subject.level})</span>
+                    </label>
+                  ))
+                ) : (
+                  <p className="text-sm text-gray-500 text-center py-2">
+                    Seçilen branş ve seviyeye uygun ders bulunamadı
+                  </p>
+                )}
+              </div>
+              {formData.selectedSubjects.length > 0 && (
+                <p className="text-xs text-blue-600 mt-1">
+                  ✨ {formData.selectedSubjects.length} ders seçildi
+                </p>
+              )}
+            </div>
+          )}
+
           <div className="button-group-mobile mt-6">
             <Button
               type="button"
@@ -701,7 +742,7 @@ const Teachers = () => {
             <Button
               type="submit"
               variant="primary"
-              disabled={formData.branches.length === 0 || formData.levels.length === 0}
+              disabled={!formData.branch || formData.levels.length === 0}
             >
               {editingTeacher ? 'Güncelle' : 'Kaydet'}
             </Button>

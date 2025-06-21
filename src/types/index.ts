@@ -7,6 +7,7 @@ export interface Teacher {
   branches?: string[]; // New field for multiple branches
   level: 'Anaokulu' | 'İlkokul' | 'Ortaokul'; // For backward compatibility
   levels?: ('Anaokulu' | 'İlkokul' | 'Ortaokul')[]; // New field for multiple levels
+  selectedSubjects?: string[]; // New field for storing selected subjects
   createdAt: Date;
 }
 
