@@ -366,6 +366,4 @@ const Teachers = () => {
 };
 
 export default Teachers;
-Use code with caution.
-TypeScript
-68.3s
+
