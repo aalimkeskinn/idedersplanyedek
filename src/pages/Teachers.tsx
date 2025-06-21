@@ -39,20 +39,16 @@ const Teachers = () => {
     subjectIds: [] as string[],
   });
 
-  // KRİTİK İYİLEŞTİRME: Seçilen seviyeler değiştiğinde, seçili dersleri de güncelle.
-  // Bu, kullanıcı bir seviyeyi kaldırdığında, o seviyeye ait derslerin seçiminin de kaldırılmasını sağlar.
   useEffect(() => {
     if (formData.subjectIds.length > 0) {
       const stillValidSubjectIds = formData.subjectIds.filter(subjectId => {
         const subject = subjects.find(s => s.id === subjectId);
-        if (!subject) return false; // Ders silinmiş olabilir
+        if (!subject) return false;
 
         const subjectLevels = subject.levels || [subject.level];
-        // Bu dersin seviyelerinden en az biri, öğretmenin yeni seviye listesinde hala var mı?
         return subjectLevels.some(sl => formData.levels.includes(sl));
       });
 
-      // Eğer geçerli ders listesi eskisinden kısaysa, state'i güncelle
       if (stillValidSubjectIds.length < formData.subjectIds.length) {
         setFormData(prev => ({
           ...prev,
@@ -61,7 +57,6 @@ const Teachers = () => {
       }
     }
   }, [formData.levels, subjects, formData.subjectIds]);
-
 
   const getUniqueBranches = () => {
     const branches = [...new Set(subjects.map(subject => subject.branch))];
@@ -93,19 +88,13 @@ const Teachers = () => {
       async () => {
         setIsDeletingAll(true);
         try {
-          let deletedCount = 0;
           for (const teacher of teachers) {
             await remove(teacher.id);
-            deletedCount++;
           }
-          if (deletedCount > 0) {
-            success('🗑️ Öğretmenler Silindi', `${deletedCount} öğretmen başarıyla silindi`);
-            setLevelFilter('');
-            setBranchFilter('');
-            setSearchQuery('');
-          } else {
-            error('❌ Silme Hatası', 'Hiçbir öğretmen silinemedi');
-          }
+          success('🗑️ Öğretmenler Silindi', `${teachers.length} öğretmen başarıyla silindi`);
+          setLevelFilter('');
+          setBranchFilter('');
+          setSearchQuery('');
         } catch (err) {
           error('❌ Silme Hatası', 'Öğretmenler silinirken bir hata oluştu');
         } finally {
@@ -149,8 +138,14 @@ const Teachers = () => {
   
   const handleBulkSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    for (const teacher of bulkTeachers) {
-      if (teacher.name && teacher.branch && teacher.level) {
+    const validTeachers = bulkTeachers.filter(t => t.name && t.branch && t.level);
+    if(validTeachers.length === 0) {
+      error('Hata', 'Lütfen en az bir geçerli öğretmen bilgisi girin.');
+      return;
+    }
+
+    try {
+      for (const teacher of validTeachers) {
         if (EDUCATION_LEVELS.includes(teacher.level as any)) {
           await add({
             name: teacher.name,
@@ -161,10 +156,12 @@ const Teachers = () => {
           } as Omit<Teacher, 'id' | 'createdAt'>);
         }
       }
+      setBulkTeachers([{ name: '', branch: '', level: '' }]);
+      setIsBulkModalOpen(false);
+      success('✅ Öğretmenler Eklendi', `${validTeachers.length} öğretmen başarıyla eklendi`);
+    } catch (err) {
+      error('❌ Hata', 'Toplu öğretmen eklenirken bir hata oluştu.');
     }
-    setBulkTeachers([{ name: '', branch: '', level: '' }]);
-    setIsBulkModalOpen(false);
-    success('✅ Öğretmenler Eklendi', `${bulkTeachers.filter(t => t.name && t.branch && t.level).length} öğretmen başarıyla eklendi`);
   };
 
   const resetForm = () => {
@@ -225,13 +222,9 @@ const Teachers = () => {
   const getTeacherBranchesDisplay = (teacher: Teacher) => teacher.branch;
   const getTeacherLevelsDisplay = (teacher: Teacher) => teacher.levels || [teacher.level];
 
-  // DERSLER LİSTESİNİ FİLTRELEME MANTIĞI
   const filteredSubjectsForModal = subjects.filter(subject => {
-    if (formData.levels.length === 0) {
-      return false; // Öğretmen için seviye seçilmediyse hiçbir dersi gösterme
-    }
+    if (formData.levels.length === 0) return false;
     const subjectLevels = subject.levels || [subject.level];
-    // Dersin seviyelerinden en az biri, öğretmenin seçili seviyelerinden biriyle eşleşmeli
     return subjectLevels.some(sl => formData.levels.includes(sl));
   }).sort((a, b) => a.name.localeCompare(b.name, 'tr'));
 
@@ -274,22 +267,17 @@ const Teachers = () => {
       <Modal isOpen={isModalOpen} onClose={resetForm} title={editingTeacher ? 'Öğretmen Düzenle' : 'Yeni Öğretmen Ekle'} size="lg">
         <form onSubmit={handleSubmit}>
           <Input label="Ad Soyad" value={formData.name} onChange={(value) => setFormData({ ...formData, name: value })} placeholder="Örn: Ahmet Yılmaz" required />
-          
           <Select label="Branş" value={formData.branch} onChange={(value) => setFormData({ ...formData, branch: value })} options={branchOptions} required />
-
           <div className="mb-4"><label className="block text-sm font-semibold text-gray-800 mb-2">Eğitim Seviyeleri <span className="text-red-500">*</span></label><div className="flex flex-wrap gap-3">{EDUCATION_LEVELS.map((level) => (<label key={level} className={`flex items-center p-3 border-2 rounded-lg cursor-pointer transition-all ${formData.levels.includes(level) ? 'bg-blue-50 border-blue-500 text-blue-700' : 'bg-white border-gray-300 text-gray-700 hover:bg-gray-50'}`}><input type="checkbox" checked={formData.levels.includes(level)} onChange={() => handleLevelToggle(level)} className="sr-only" /><span className="text-sm font-medium">{level}</span>{formData.levels.includes(level) && (<span className="ml-2 text-blue-600">✓</span>)}</label>))}</div>{formData.levels.length > 0 && (<p className="text-xs text-blue-600 mt-2">✨ Seçilen seviyeler: {formData.levels.join(', ')}</p>)}</div>
-          
           <div className="mt-6 pt-6 border-t border-gray-200">
             <h3 className="text-lg font-medium text-gray-900 mb-4 flex items-center"><BookOpen className="w-5 h-5 mr-2 text-indigo-600" />Dersler</h3>
             <div className="space-y-2 p-3 border border-gray-300 rounded-lg bg-gray-50 max-h-60 overflow-y-auto">
-              {/* DERS LİSTESİ FİLTRELENMİŞ HALİYLE KULLANILIYOR */}
               {filteredSubjectsForModal.map((subject) => (
                 <label key={subject.id} className="flex items-center space-x-3 cursor-pointer p-2 hover:bg-gray-100 rounded-md">
                   <input type="checkbox" checked={formData.subjectIds.includes(subject.id)} onChange={() => handleSubjectToggle(subject.id)} className="w-4 h-4 text-indigo-600 bg-gray-100 border-gray-300 rounded focus:ring-indigo-500" />
                   <span className="text-sm font-medium text-gray-700">{subject.name}<span className="text-xs text-gray-500 ml-2">({subject.branch} - {(subject.levels || [subject.level]).join(', ')})</span></span>
                 </label>
               ))}
-              {/* Seviye seçilmediğinde veya uygun ders olmadığında gösterilecek mesaj */}
               {formData.levels.length > 0 && filteredSubjectsForModal.length === 0 && (
                 <div className="text-center text-sm text-gray-500 py-4">Seçilen seviyelere uygun ders bulunamadı.</div>
               )}
@@ -299,15 +287,85 @@ const Teachers = () => {
             </div>
             {formData.subjectIds.length > 0 && (<p className="text-xs text-indigo-600 mt-2">✨ {formData.subjectIds.length} ders seçildi.</p>)}
           </div>
-
           <div className="button-group-mobile mt-6"><Button type="button" onClick={resetForm} variant="secondary">İptal</Button><Button type="submit" variant="primary" disabled={!formData.branch || formData.levels.length === 0}>{editingTeacher ? 'Güncelle' : 'Kaydet'}</Button></div>
         </form>
       </Modal>
 
-      <Modal isOpen={isBulkModalOpen} onClose={() => setIsBulkModalOpen(false)} title="Toplu Öğretmen Ekleme">{/* ... Bulk Add Modal içeriği aynı kalabilir ... */}</Modal>
+      {/* DÜZELTİLMİŞ TOPLU EKLEME MODALI */}
+      <Modal
+        isOpen={isBulkModalOpen}
+        onClose={() => setIsBulkModalOpen(false)}
+        title="Toplu Öğretmen Ekleme"
+      >
+        <form onSubmit={handleBulkSubmit}>
+          <div className="mb-4">
+            <div className="flex items-center justify-between mb-3">
+              <label className="block text-sm font-medium text-gray-700">Öğretmen Listesi</label>
+              <Button type="button" onClick={addBulkRow} variant="secondary" size="sm">+ Satır Ekle</Button>
+            </div>
+            <div className="space-y-3 max-h-96 overflow-y-auto">
+              {bulkTeachers.map((teacher, index) => (
+                <div key={index} className="grid grid-cols-4 gap-2 p-3 bg-gray-50 rounded-lg">
+                  <input
+                    type="text"
+                    placeholder="Ad Soyad"
+                    value={teacher.name}
+                    onChange={(e) => updateBulkRow(index, 'name', e.target.value)}
+                    className="col-span-2 px-2 py-1 border border-gray-300 rounded text-sm focus:outline-none focus:ring-1 focus:ring-blue-500"
+                    required
+                  />
+                  {/* BRANŞ ALANI SELECT BOX OLARAK GÜNCELLENDİ */}
+                  <select
+                    value={teacher.branch}
+                    onChange={(e) => updateBulkRow(index, 'branch', e.target.value)}
+                    className="w-full px-2 py-1 border border-gray-300 rounded text-sm focus:outline-none focus:ring-1 focus:ring-blue-500"
+                    required
+                  >
+                    <option value="">Branş Seç</option>
+                    {getUniqueBranches().map(branch => (
+                      <option key={branch} value={branch}>{branch}</option>
+                    ))}
+                  </select>
+                  <div className="flex items-center space-x-1">
+                    <select
+                      value={teacher.level}
+                      onChange={(e) => updateBulkRow(index, 'level', e.target.value)}
+                      className="w-full px-2 py-1 border border-gray-300 rounded text-sm focus:outline-none focus:ring-1 focus:ring-blue-500"
+                      required
+                    >
+                      <option value="">Seviye</option>
+                      {EDUCATION_LEVELS.map(level => (
+                        <option key={level} value={level}>{level}</option>
+                      ))}
+                    </select>
+                    <button
+                      type="button"
+                      onClick={() => removeBulkRow(index)}
+                      className="p-1.5 bg-red-100 text-red-600 rounded hover:bg-red-200 disabled:opacity-50"
+                      disabled={bulkTeachers.length === 1}
+                    >
+                      <Trash2 size={14} />
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+          <div className="button-group-mobile mt-4">
+            <Button type="button" onClick={() => setIsBulkModalOpen(false)} variant="secondary">İptal</Button>
+            <Button type="submit" variant="primary">
+              Toplu Ekle ({bulkTeachers.filter(t => t.name && t.branch && t.level).length} öğretmen)
+            </Button>
+          </div>
+        </form>
+      </Modal>
+
       <ConfirmationModal isOpen={confirmation.isOpen} onClose={hideConfirmation} onConfirm={confirmation.onConfirm} title={confirmation.title} message={confirmation.message} type={confirmation.type} confirmText={confirmation.confirmText} cancelText={confirmation.cancelText} confirmVariant={confirmation.confirmVariant} />
     </div>
   );
 };
 
 export default Teachers;
+Use code with caution.
+TypeScript
+68.3s
