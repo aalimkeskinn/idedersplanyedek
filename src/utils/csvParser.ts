@@ -16,6 +16,8 @@ export interface ParsedCSVData {
   classes: Map<string, Partial<Class>>;
   subjects: Map<string, Partial<Subject>>;
   classTeacherAssignments: Map<string, { classTeacherName: string | null; teacherNames: Set<string> }>;
+  // YENİ EKLENDİ: Öğretmenlerin hangi dersleri verdiğini takip etmek için.
+  teacherSubjectAssignments: Map<string, Set<string>>;
   errors: string[];
 }
 
@@ -26,9 +28,6 @@ export interface ParsedCSVData {
  * @returns Standartlaştırılmış seviye ('Anaokulu', 'İlkokul', 'Ortaokul') veya null.
  */
 const normalizeLevel = (level: string): ('Anaokulu' | 'İlkokul' | 'Ortaokul') | null => {
-    // KRİTİK DÜZELTME: 'İ' karakterinin doğru şekilde 'i' harfine dönüştürülmesi için
-    // ve "İLOKUL", "ilkokul" gibi farklı yazımları yakalamak için
-    // Türkçe'ye özgü küçük harfe çevirme fonksiyonu kullanıldı.
     const lowerLevel = level.trim().toLocaleLowerCase('tr-TR');
       
     if (lowerLevel.includes('anaokul')) return 'Anaokulu';
@@ -42,6 +41,8 @@ export const parseComprehensiveCSV = (csvContent: string): ParsedCSVData => {
   const classes = new Map<string, Partial<Class>>();
   const subjects = new Map<string, Partial<Subject>>();
   const classTeacherAssignments = new Map<string, { classTeacherName: string | null; teacherNames: Set<string> }>();
+  // YENİ EKLENDİ: Öğretmen-Ders ilişkisini tutacak map.
+  const teacherSubjectAssignments = new Map<string, Set<string>>();
   const errors: string[] = [];
 
   const lines = csvContent.split('\n').filter(line => line.trim() && !line.startsWith(';'));
@@ -73,6 +74,15 @@ export const parseComprehensiveCSV = (csvContent: string): ParsedCSVData => {
     
     const branches = rawRow.branch.split('|').map(b => b.trim());
 
+    // YENİ EKLENDİ: Her satır için ders anahtarını burada oluşturuyoruz.
+    const subjectKey = `${rawRow.subjectName.toLowerCase()}-${rawRow.branch.toLowerCase()}`;
+
+    // YENİ EKLENDİ: Öğretmene bu ders anahtarını atıyoruz.
+    if (!teacherSubjectAssignments.has(rawRow.teacherName)) {
+      teacherSubjectAssignments.set(rawRow.teacherName, new Set<string>());
+    }
+    teacherSubjectAssignments.get(rawRow.teacherName)!.add(subjectKey);
+
     levels.forEach(level => {
       // --- Öğretmen Verisini Birleştir ---
       if (!teachers.has(rawRow.teacherName)) {
@@ -103,25 +113,16 @@ export const parseComprehensiveCSV = (csvContent: string): ParsedCSVData => {
         }
       });
       
-      // *** KRİTİK DÜZELTME 3: DERS BİRLEŞTİRME MANTIĞI ***
-      // Benzersiz anahtar artık SADECE ders adı ve branş. Haftalık saat, dersin bir özelliği değil,
-      // dersin sınıfla olan ilişkisinin bir özelliğidir. Bu yüzden anahtardan çıkarıldı.
-      const subjectKey = `${rawRow.subjectName.toLowerCase()}-${rawRow.branch.toLowerCase()}`;
-      
+      // *** Ders birleştirme mantığı ***
       if (!subjects.has(subjectKey)) {
-        // Eğer bu ders ilk defa görülüyorsa, yeni bir kayıt oluştur.
-        // Haftalık saat, ilk karşılaşılan değer olarak varsayılan olarak atanır.
-        // Bu değer daha sonra ders programı sihirbazında her sınıf için özel olarak ayarlanabilir.
         subjects.set(subjectKey, {
           name: rawRow.subjectName,
           branch: rawRow.branch,
-          level: level, // İlk bulunan seviyeyi ana seviye yap (geriye uyumluluk için)
-          levels: new Set([level]), // Seviyeleri bir Set içinde tutmaya başla
+          level: level,
+          levels: new Set([level]),
           weeklyHours: rawRow.weeklyHours || 1,
         });
       } else {
-        // Eğer bu ders zaten mevcutsa, sadece yeni seviyeyi `levels` set'ine ekle.
-        // Haftalık saatini GÜNCELLEMİYORUZ, çünkü bu artık dersin genel bir özelliği değil.
         const subjectEntry = subjects.get(subjectKey)!;
         (subjectEntry.levels as Set<any>).add(level);
       }
@@ -132,18 +133,18 @@ export const parseComprehensiveCSV = (csvContent: string): ParsedCSVData => {
   teachers.forEach(teacher => {
     teacher.branches = Array.from(teacher.branches as Set<string>);
     teacher.levels = Array.from(teacher.levels as Set<any>);
-    teacher.branch = (teacher.branches as string[])[0]; // Geriye uyumluluk için ilk branşı ata
-    teacher.level = (teacher.levels as any[])[0]; // Geriye uyumluluk için ilk seviyeyi ata
+    teacher.branch = (teacher.branches as string[])[0];
+    teacher.level = (teacher.levels as any[])[0];
   });
 
   classes.forEach(classItem => {
     classItem.levels = Array.from(classItem.levels as Set<any>);
-    classItem.level = (classItem.levels as any[])[0]; // Geriye uyumluluk için ilk seviyeyi ata
+    classItem.level = (classItem.levels as any[])[0];
   });
 
   subjects.forEach(subject => {
     subject.levels = Array.from(subject.levels as Set<any>);
-    subject.level = (subject.levels as any[])[0]; // Geriye uyumluluk için ilk seviyeyi ata
+    subject.level = (subject.levels as any[])[0];
   });
 
   return { 
@@ -151,6 +152,7 @@ export const parseComprehensiveCSV = (csvContent: string): ParsedCSVData => {
     classes, 
     subjects, 
     classTeacherAssignments, 
+    teacherSubjectAssignments, // YENİ EKLENDİ: İlişki haritasını döndür
     errors 
   };
 };
