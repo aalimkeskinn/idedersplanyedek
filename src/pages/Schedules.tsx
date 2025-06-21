@@ -40,7 +40,7 @@ const Schedules = () => {
   
   // New state for education level and branch selection
   const [selectedLevel, setSelectedLevel] = useState<string>('');
-  const [selectedBranch, setSelectedBranch] = useState<string>('');
+  const [selectedSubject, setSelectedSubject] = useState<string>('');
   const [showScheduleTable, setShowScheduleTable] = useState(false);
 
   // Check URL parameters for mode and entity ID
@@ -77,9 +77,9 @@ const Schedules = () => {
         setOriginalSchedule(JSON.parse(JSON.stringify(emptySchedule)));
       }
       
-      // Reset level and branch selection when teacher changes
+      // Reset level and subject selection when teacher changes
       setSelectedLevel('');
-      setSelectedBranch('');
+      setSelectedSubject('');
       setShowScheduleTable(false);
       
     } else if (mode === 'class' && selectedClassId) {
@@ -139,35 +139,53 @@ const Schedules = () => {
     ? getTeacherLevels(selectedTeacher).map(level => ({ value: level, label: level }))
     : [];
   
-  const branchOptions = selectedTeacher 
-    ? getTeacherBranches(selectedTeacher).map(branch => ({ value: branch, label: branch }))
-    : [];
+  // Get subject options based on selected level and branch
+  const getSubjectOptions = () => {
+    if (!selectedTeacher || !selectedLevel) return [];
+    
+    const teacherBranch = selectedTeacher.branch;
+    
+    return subjects
+      .filter(subject => {
+        // Check if subject matches teacher's branch
+        const matchesBranch = subject.branch === teacherBranch;
+        
+        // Check if subject level matches selected level
+        const subjectLevels = subject.levels || [subject.level];
+        const matchesLevel = subjectLevels.includes(selectedLevel as any);
+        
+        return matchesBranch && matchesLevel;
+      })
+      .map(subject => ({
+        value: subject.id,
+        label: subject.name
+      }));
+  };
 
-  // Check if level and branch are selected
+  const subjectOptions = getSubjectOptions();
+
+  // Check if level and subject are selected
   useEffect(() => {
-    if (mode === 'teacher' && selectedTeacherId && selectedLevel && selectedBranch) {
+    if (mode === 'teacher' && selectedTeacherId && selectedLevel && selectedSubject) {
       setShowScheduleTable(true);
     } else {
       setShowScheduleTable(mode === 'class' && !!selectedClassId);
     }
-  }, [mode, selectedTeacherId, selectedClassId, selectedLevel, selectedBranch]);
+  }, [mode, selectedTeacherId, selectedClassId, selectedLevel, selectedSubject]);
 
-  // Get filtered classes based on selected level and branch
+  // Get filtered classes based on selected level and subject
   const getFilteredClasses = () => {
-    if (mode !== 'teacher' || !selectedLevel || !selectedBranch) return classes;
+    if (mode !== 'teacher' || !selectedLevel || !selectedSubject) return classes;
+    
+    const selectedSubjectObj = subjects.find(s => s.id === selectedSubject);
+    if (!selectedSubjectObj) return classes;
     
     return classes.filter(classItem => {
       // Check if class has the selected level (either in legacy level field or new levels array)
       const classLevels = classItem.levels || [classItem.level];
       const matchesLevel = classLevels.includes(selectedLevel as any);
       
-      // For branch, we need to check if the subject with this branch exists for this class level
-      const matchingSubjects = subjects.filter(subject => {
-        const subjectLevels = subject.levels || [subject.level];
-        return subject.branch === selectedBranch && subjectLevels.some(sl => classLevels.includes(sl as any));
-      });
-      
-      return matchesLevel && matchingSubjects.length > 0;
+      return matchesLevel;
     });
   };
 
@@ -236,7 +254,7 @@ const Schedules = () => {
     if (mode === 'teacher' && classId) {
       updatedSchedule[selectedDay][selectedPeriod] = classId ? {
         classId,
-        subjectId
+        subjectId: selectedSubject || subjectId // Use selected subject if available
       } : null;
     } else if (mode === 'class' && teacherId) {
       updatedSchedule[selectedDay][selectedPeriod] = teacherId ? {
@@ -437,7 +455,7 @@ const Schedules = () => {
     setOriginalSchedule({});
     setHasUnsavedChanges(false);
     setSelectedLevel('');
-    setSelectedBranch('');
+    setSelectedSubject('');
     setShowScheduleTable(false);
   };
 
@@ -448,8 +466,9 @@ const Schedules = () => {
       if (!slot?.classId || slot.classId === 'fixed-period') return null;
       
       const classItem = classes.find(c => c.id === slot.classId);
+      const subject = subjects.find(s => s.id === slot.subjectId);
       
-      return { classItem };
+      return { classItem, subject };
     } else {
       if (!slot?.teacherId) return null;
       
@@ -567,13 +586,13 @@ const Schedules = () => {
                   confirmUnsavedChanges(() => {
                     setSelectedTeacherId(value);
                     setSelectedLevel('');
-                    setSelectedBranch('');
+                    setSelectedSubject('');
                     setShowScheduleTable(false);
                   });
                 } else {
                   setSelectedTeacherId(value);
                   setSelectedLevel('');
-                  setSelectedBranch('');
+                  setSelectedSubject('');
                   setShowScheduleTable(false);
                 }
               }}
@@ -620,16 +639,18 @@ const Schedules = () => {
                     required
                   />
                   
-                  <Select
-                    label="Branş Seçin"
-                    value={selectedBranch}
-                    onChange={setSelectedBranch}
-                    options={branchOptions}
-                    required
-                  />
+                  {selectedLevel && (
+                    <Select
+                      label="Ders Seçin"
+                      value={selectedSubject}
+                      onChange={setSelectedSubject}
+                      options={subjectOptions}
+                      required
+                    />
+                  )}
                 </div>
                 
-                {!showScheduleTable && selectedLevel && selectedBranch && (
+                {!showScheduleTable && selectedLevel && selectedSubject && (
                   <div className="flex justify-center">
                     <Button
                       onClick={() => setShowScheduleTable(true)}
@@ -670,12 +691,12 @@ const Schedules = () => {
               <div>
                 <h3 className="font-medium text-gray-900">
                   {mode === 'teacher' 
-                    ? `${selectedTeacher?.name || 'Öğretmen'} - ${selectedLevel} - ${selectedBranch} Programı` 
+                    ? `${selectedTeacher?.name || 'Öğretmen'} - ${selectedLevel} - ${subjects.find(s => s.id === selectedSubject)?.name || 'Ders'} Programı` 
                     : `${selectedClass?.name || 'Sınıf'} Programı`}
                 </h3>
                 <p className="text-sm text-gray-600">
                   {mode === 'teacher' 
-                    ? `${selectedLevel} seviyesindeki ${selectedBranch} dersleri için program` 
+                    ? `${selectedLevel} seviyesindeki ${subjects.find(s => s.id === selectedSubject)?.name || 'ders'} için program` 
                     : `${selectedClass?.level || ''} seviyesi`}
                 </p>
               </div>
@@ -811,16 +832,21 @@ const Schedules = () => {
                               {slotInfo ? (
                                 <div className="text-center p-2 bg-blue-50 rounded border border-blue-200 hover:bg-blue-100 cursor-pointer transition-colors">
                                   {mode === 'teacher' ? (
-                                    <div className="font-medium text-blue-900 text-sm">
-                                      {slotInfo.classItem?.name}
-                                    </div>
+                                    <>
+                                      <div className="font-medium text-blue-900 text-sm">
+                                        {slotInfo.classItem?.name}
+                                      </div>
+                                      <div className="text-xs text-blue-700 mt-1">
+                                        {slotInfo.subject?.name || selectedTeacher?.name}
+                                      </div>
+                                    </>
                                   ) : (
                                     <>
                                       <div className="font-medium text-blue-900 text-sm">
                                         {slotInfo.teacher?.name}
                                       </div>
                                       <div className="text-xs text-blue-700 mt-1">
-                                        {slotInfo.subject?.branch || ''}
+                                        {slotInfo.subject?.name || ''}
                                       </div>
                                     </>
                                   )}
@@ -899,9 +925,9 @@ const Schedules = () => {
       {mode === 'teacher' && selectedTeacherId && !showScheduleTable && (
         <div className="text-center py-12 bg-gray-50 rounded-lg border border-gray-200">
           <Calendar className="w-16 h-16 text-gray-300 mx-auto mb-4" />
-          <h3 className="text-lg font-medium text-gray-900 mb-2">Eğitim Seviyesi ve Branş Seçin</h3>
+          <h3 className="text-lg font-medium text-gray-900 mb-2">Eğitim Seviyesi ve Ders Seçin</h3>
           <p className="text-gray-500 mb-4">
-            Program tablosunu görmek için yukarıdan eğitim seviyesi ve branş seçin
+            Program tablosunu görmek için yukarıdan eğitim seviyesi ve ders seçin
           </p>
         </div>
       )}
@@ -927,17 +953,16 @@ const Schedules = () => {
         onClose={() => setIsSlotModalOpen(false)}
         onSave={handleSaveSlot}
         subjects={subjects.filter(s => {
-          if (mode === 'teacher' && selectedLevel && selectedBranch) {
-            // Filter subjects by selected level and branch
-            const subjectLevels = s.levels || [s.level];
-            return s.branch === selectedBranch && subjectLevels.includes(selectedLevel as any);
+          if (mode === 'teacher' && selectedLevel && selectedSubject) {
+            // In teacher mode, only show the selected subject
+            return s.id === selectedSubject;
           }
           return true;
         })}
         classes={sortedClasses}
         teachers={teachers}
         mode={mode}
-        currentSubjectId={currentSchedule[selectedDay]?.[selectedPeriod]?.subjectId || ''}
+        currentSubjectId={currentSchedule[selectedDay]?.[selectedPeriod]?.subjectId || selectedSubject || ''}
         currentClassId={
           mode === 'teacher' 
             ? currentSchedule[selectedDay]?.[selectedPeriod]?.classId || '' 

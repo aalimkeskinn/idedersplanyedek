@@ -47,14 +47,14 @@ const ScheduleSlotModal: React.FC<ScheduleSlotModalProps> = ({
     if (mode === 'teacher') {
       if (selectedClassId) {
         const defaultSubject = subjects[0];
-        onSave(defaultSubject?.id || '', selectedClassId);
+        onSave(selectedSubjectId || defaultSubject?.id || '', selectedClassId);
       } else {
         onSave('', '');
       }
     } else {
       if (selectedTeacherId) {
         const defaultSubject = subjects[0];
-        onSave(defaultSubject?.id || '', selectedClassId, selectedTeacherId);
+        onSave(selectedSubjectId || defaultSubject?.id || '', selectedClassId, selectedTeacherId);
       } else {
         onSave('', '', '');
       }
@@ -83,6 +83,13 @@ const ScheduleSlotModal: React.FC<ScheduleSlotModalProps> = ({
   const teacherOptions = sortedTeachers.map(teacher => ({
     value: teacher.id,
     label: `${teacher.name} (${teacher.branch})`
+  }));
+
+  // Dersleri A'dan Z'ye sırala
+  const sortedSubjects = [...subjects].sort((a, b) => a.name.localeCompare(b.name, 'tr'));
+  const subjectOptions = sortedSubjects.map(subject => ({
+    value: subject.id,
+    label: subject.name
   }));
 
   if (!isOpen) return null;
@@ -118,6 +125,16 @@ const ScheduleSlotModal: React.FC<ScheduleSlotModalProps> = ({
             </div>
 
             <div className="space-y-4">
+              {/* Subject selection - only show if there are multiple subjects */}
+              {subjects.length > 1 && (
+                <Select
+                  label="Ders Seçin"
+                  value={selectedSubjectId}
+                  onChange={setSelectedSubjectId}
+                  options={subjectOptions}
+                />
+              )}
+
               {mode === 'teacher' ? (
                 <Select
                   label="Sınıf Seçin (A-Z Sıralı)"
