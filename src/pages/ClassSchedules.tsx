@@ -639,7 +639,7 @@ const ClassSchedules = () => {
                                       }
                                     </div>
                                     <div className="text-emerald-700 text-xs mt-1 font-medium">
-                                      {slot.subject?.branch || ''}
+                                      {slot.subject?.name || slot.subject?.branch || ''}
                                     </div>
                                   </div>
                                 ) : (

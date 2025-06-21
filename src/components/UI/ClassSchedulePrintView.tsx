@@ -145,7 +145,7 @@ const ClassSchedulePrintView: React.FC<ClassSchedulePrintViewProps> = ({
                           </div>
                           <div style={{ fontSize: '9px', color: '#666666' }}>
                             {/* Dersi güvenli bir şekilde göster, bulunamazsa branşı göster */}
-                            {subject?.branch || ''}
+                            {subject?.name || subject?.branch || ''}
                           </div>
                         </div>
                       ) : (
