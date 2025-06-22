@@ -309,9 +309,9 @@ const Classes = () => {
     return teachers
       .filter(teacher => {
         // Check if teacher has at least one level that matches class levels
+        const teacherLevels = teacher.levels || [teacher.level];
         return formData.levels.some(level => 
-          teacher.level === level || 
-          (teacher.levels && teacher.levels.includes(level))
+          teacherLevels.includes(level)
         );
       })
       .sort((a, b) => a.name.localeCompare(b.name, 'tr'));
