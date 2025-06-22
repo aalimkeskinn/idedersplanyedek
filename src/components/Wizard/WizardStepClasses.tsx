@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { Building, Users, Plus, Minus, AlertTriangle, Edit, Trash2 } from 'lucide-react';
+import React, { useState } from 'react';
+import { Building, Users, Plus, Edit, Trash2 } from 'lucide-react';
 import { Class, EDUCATION_LEVELS, Teacher } from '../../types';
 import { WizardData } from '../../types/wizard';
 import { useFirestore } from '../../hooks/useFirestore';
@@ -9,12 +9,18 @@ import Modal from '../UI/Modal';
 import Input from '../UI/Input';
 
 interface WizardStepClassesProps {
-  data: WizardData; // WizardData'nın tamamını alıyoruz
-  onUpdate: (data: Partial<WizardData>) => void; // Partial update yapabilen fonksiyon
+  data: WizardData;
+  onUpdate: (data: Partial<WizardData>) => void;
+  // DÜZELTME: `classes` prop'u eklendi.
+  classes: Class[];
 }
 
-const WizardStepClasses: React.FC<WizardStepClassesProps> = ({ data, onUpdate }) => {
-  const { data: all_classes, add: addClass, update: updateClass, remove: removeClass } = useFirestore<Class>('classes');
+const WizardStepClasses: React.FC<WizardStepClassesProps> = ({
+  data,
+  onUpdate,
+  classes: all_classes // Gelen prop'u `all_classes` olarak yeniden adlandırdık.
+}) => {
+  const { add: addClass, update: updateClass, remove: removeClass } = useFirestore<Class>('classes');
   const { data: teachers } = useFirestore<Teacher>('teachers');
 
   const [selectedLevel, setSelectedLevel] = useState('');
