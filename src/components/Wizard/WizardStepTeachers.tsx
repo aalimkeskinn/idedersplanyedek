@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
-// HATA DÜZELTİLDİ: Eksik olan BookOpen ikonu eklendi.
 import { Plus, Edit, Trash2, Users, Check, BookOpen } from 'lucide-react';
-import { Teacher, EDUCATION_LEVELS, Subject } from '../../types';
+import { Teacher, EDUCATION_LEVELS, Subject, Class } from '../../types';
+import { WizardData } from '../../types/wizard';
 import { useFirestore } from '../../hooks/useFirestore';
 import { useToast } from '../../hooks/useToast';
 import Button from '../UI/Button';
@@ -12,20 +12,24 @@ import Select from '../UI/Select';
 interface WizardStepTeachersProps {
   selectedTeachers: string[];
   onSelectedTeachersChange: (teacherIds: string[]) => void;
+  // GÜNCELLENDİ: Otomatik seçim için yeni proplar
+  wizardData: WizardData;
+  all_classes: Class[];
 }
 
 const WizardStepTeachers: React.FC<WizardStepTeachersProps> = ({
   selectedTeachers,
-  onSelectedTeachersChange
+  onSelectedTeachersChange,
+  wizardData,
+  all_classes,
 }) => {
   const { data: teachers, add: addTeacher, update: updateTeacher, remove: removeTeacher } = useFirestore<Teacher>('teachers');
   const { data: subjects } = useFirestore<Subject>('subjects');
-  const { success, error } = useToast();
+  const { success, error, info } = useToast();
   
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingTeacher, setEditingTeacher] = useState<Teacher | null>(null);
   
-  // Teachers.tsx ile aynı form state'i
   const [formData, setFormData] = useState({
     name: '',
     branch: '',
@@ -33,21 +37,40 @@ const WizardStepTeachers: React.FC<WizardStepTeachersProps> = ({
     subjectIds: [] as string[],
   });
 
+  // YENİ EKLENDİ: Otomatik öğretmen seçme mantığı
   useEffect(() => {
-    if (formData.subjectIds.length > 0) {
-      const stillValidSubjectIds = formData.subjectIds.filter(subjectId => {
-        const subject = subjects.find(s => s.id === subjectId);
-        if (!subject) return false;
-        const subjectLevels = subject.levels || [subject.level];
-        return subjectLevels.some(sl => formData.levels.includes(sl));
-      });
-      if (stillValidSubjectIds.length < formData.subjectIds.length) {
-        setFormData(prev => ({ ...prev, subjectIds: stillValidSubjectIds }));
+    const selectedClassIds = wizardData.classes?.selectedClasses || [];
+    
+    if (selectedClassIds.length === 0 || all_classes.length === 0) {
+      return; // Sınıf seçimi yoksa veya sınıflar henüz yüklenmediyse işlem yapma
+    }
+
+    const teacherIdsFromClasses = new Set<string>();
+    const selectedClassObjects = all_classes.filter(c => selectedClassIds.includes(c.id));
+
+    selectedClassObjects.forEach(classItem => {
+      (classItem.teacherIds || []).forEach(id => teacherIdsFromClasses.add(id));
+      if (classItem.classTeacherId) {
+        teacherIdsFromClasses.add(classItem.classTeacherId);
+      }
+    });
+
+    if (teacherIdsFromClasses.size > 0) {
+      const newSelectedTeachers = Array.from(new Set([...selectedTeachers, ...Array.from(teacherIdsFromClasses)]));
+
+      // Sadece gerçekten bir değişiklik varsa state'i güncelle ve bildirim göster
+      if (newSelectedTeachers.length > selectedTeachers.length) {
+        onSelectedTeachersChange(newSelectedTeachers);
+        info(
+          'Öğretmenler Otomatik Seçildi',
+          `Seçilen sınıflara atanmış ${teacherIdsFromClasses.size} öğretmen listeye eklendi.`
+        );
       }
     }
-  }, [formData.levels, subjects, formData.subjectIds]);
+  // Bu useEffect'in sadece sınıf seçimi değiştiğinde çalışmasını istiyoruz.
+  }, [wizardData.classes.selectedClasses, all_classes]);
 
-  // Teachers.tsx ile aynı handleSubmit
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!formData.branch) { error('❌ Branş Seçimi Gerekli', 'Lütfen bir branş seçin.'); return; }
@@ -116,7 +139,7 @@ const WizardStepTeachers: React.FC<WizardStepTeachersProps> = ({
       <div className="text-center">
         <div className="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-4"><Users className="w-8 h-8 text-blue-600" /></div>
         <h3 className="text-lg font-semibold text-gray-900 mb-2">Öğretmen Seçimi</h3>
-        <p className="text-gray-600">Programa dahil edilecek öğretmenleri seçin veya yeni öğretmen ekleyin.</p>
+        <p className="text-gray-600">Programa dahil edilecek öğretmenleri seçin. Sınıf adımında seçtiğiniz öğretmenler otomatik olarak işaretlenir.</p>
       </div>
       <div className="flex items-center justify-between">
         <div><h3 className="text-lg font-semibold">Öğretmenler ({teachers.length})</h3></div>
@@ -127,7 +150,7 @@ const WizardStepTeachers: React.FC<WizardStepTeachersProps> = ({
       </div>
       {sortedTeachers.length > 0 ? (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {sortedTeachers.map(teacher => {
+          {sortedTeachers.map((teacher) => {
             const isSelected = selectedTeachers.includes(teacher.id);
             return (
               <div key={teacher.id} className={`relative bg-white rounded-lg border-2 p-4 transition-all cursor-pointer ${isSelected ? 'border-blue-500 bg-blue-50' : 'border-gray-200 hover:border-gray-300'}`} onClick={() => handleTeacherToggle(teacher.id)}>
