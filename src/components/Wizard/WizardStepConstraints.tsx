@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Clock, User, Building, BookOpen, Settings, AlertTriangle } from 'lucide-react';
+import { Clock, User, Building, BookOpen, Settings, AlertTriangle, XCircle } from 'lucide-react';
 import { Teacher, Class, Subject, DAYS, PERIODS } from '../../types';
 import { WizardData } from '../../types/wizard';
 import { TimeConstraint, CONSTRAINT_TYPES, ConstraintType } from '../../types/constraints';
@@ -205,6 +205,61 @@ const WizardStepConstraints: React.FC<WizardStepConstraintsProps> = ({
     console.log('✅ Constraints başarıyla kaydedildi');
   };
 
+  // NEW: Mark all slots as unavailable for the selected entity
+  const handleMarkAllUnavailable = () => {
+    if (!selectedEntity) {
+      console.warn('⚠️ Seçili entity yok, işlem iptal edildi');
+      return;
+    }
+
+    console.log('🔄 Tüm slotlar "Müsait Değil" olarak işaretleniyor:', {
+      entityId: selectedEntity,
+      entityType: activeTab
+    });
+
+    // Create new constraints for all days and periods
+    const newConstraints = [...localConstraints];
+    
+    DAYS.forEach(day => {
+      PERIODS.forEach(period => {
+        // Check if constraint already exists
+        const existingConstraintIndex = newConstraints.findIndex(c => 
+          c.entityId === selectedEntity && 
+          c.entityType === activeTab && 
+          c.day === day && 
+          c.period === period
+        );
+        
+        if (existingConstraintIndex !== -1) {
+          // Update existing constraint
+          newConstraints[existingConstraintIndex] = {
+            ...newConstraints[existingConstraintIndex],
+            constraintType: 'unavailable',
+            reason: `Müsait Değil - ${getEntityName(getSelectedEntity())}`,
+            updatedAt: new Date()
+          };
+        } else {
+          // Create new constraint
+          newConstraints.push({
+            id: `${selectedEntity}-${day}-${period}-${Date.now()}`,
+            entityType: activeTab as 'teacher' | 'class' | 'subject',
+            entityId: selectedEntity,
+            day,
+            period,
+            constraintType: 'unavailable',
+            reason: `Müsait Değil - ${getEntityName(getSelectedEntity())}`,
+            createdAt: new Date(),
+            updatedAt: new Date()
+          });
+        }
+      });
+    });
+    
+    setLocalConstraints(newConstraints);
+    setHasUnsavedChanges(true);
+    console.log('✅ Tüm slotlar "Müsait Değil" olarak işaretlendi');
+  };
+
   const globalConstraints = data.constraints?.globalRules || {};
   const EntityIcon = getEntityIcon();
   const entityColor = getEntityColor();
@@ -388,11 +443,24 @@ const WizardStepConstraints: React.FC<WizardStepConstraintsProps> = ({
                         <p className="text-sm text-gray-600">{entityDetails}</p>
                       </div>
                     </div>
-                    {hasUnsavedChanges && (
-                      <span className="inline-flex items-center px-2 py-1 text-xs font-medium rounded-full bg-yellow-100 text-yellow-800">
-                        Kaydedilmemiş değişiklikler
-                      </span>
-                    )}
+                    <div className="flex items-center space-x-2">
+                      {/* NEW: Mark All Unavailable Button */}
+                      <Button
+                        onClick={handleMarkAllUnavailable}
+                        icon={XCircle}
+                        variant="danger"
+                        size="sm"
+                        title="Tüm saatleri 'Müsait Değil' olarak işaretle"
+                      >
+                        Tümünü Müsait Değil Yap
+                      </Button>
+                      
+                      {hasUnsavedChanges && (
+                        <span className="inline-flex items-center px-2 py-1 text-xs font-medium rounded-full bg-yellow-100 text-yellow-800">
+                          Kaydedilmemiş değişiklikler
+                        </span>
+                      )}
+                    </div>
                   </div>
                 </div>
 
