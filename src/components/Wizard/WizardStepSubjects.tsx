@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { BookOpen, Plus, Minus, Edit, Trash2 } from 'lucide-react';
+import { BookOpen, Plus, Minus, Edit, Trash2, CheckSquare, Square } from 'lucide-react';
 import { Subject, EDUCATION_LEVELS } from '../../types';
 import { WizardData } from '../../types/wizard';
 import { useFirestore } from '../../hooks/useFirestore';
@@ -46,8 +46,52 @@ const WizardStepSubjects: React.FC<WizardStepSubjectsProps> = ({ data, onUpdate 
       newSubjectHours[subjectId] = subject?.weeklyHours || 1;
     }
     
-    // Öncelik objesi artık güncellenmiyor
     onUpdate({ selectedSubjects: newSelectedSubjects, subjectHours: newSubjectHours, subjectPriorities: data.subjectPriorities });
+  };
+
+  // YENİ: Tümünü seç/kaldır fonksiyonu
+  const handleSelectAll = () => {
+    const currentFilteredIds = filteredSubjects.map(s => s.id);
+    const allCurrentlySelected = currentFilteredIds.every(id => data.selectedSubjects.includes(id));
+    
+    if (allCurrentlySelected) {
+      // Tümünü kaldır
+      const newSelectedSubjects = data.selectedSubjects.filter(id => !currentFilteredIds.includes(id));
+      const newSubjectHours = { ...data.subjectHours };
+      
+      // Kaldırılan derslerin saatlerini sil
+      currentFilteredIds.forEach(id => {
+        delete newSubjectHours[id];
+      });
+      
+      onUpdate({ 
+        selectedSubjects: newSelectedSubjects, 
+        subjectHours: newSubjectHours, 
+        subjectPriorities: data.subjectPriorities 
+      });
+      
+      success('✅ Seçim Kaldırıldı', `${currentFilteredIds.length} dersin seçimi kaldırıldı`);
+    } else {
+      // Tümünü seç
+      const newSelectedSubjects = [...new Set([...data.selectedSubjects, ...currentFilteredIds])];
+      const newSubjectHours = { ...data.subjectHours };
+      
+      // Yeni seçilen derslerin saatlerini ekle
+      currentFilteredIds.forEach(id => {
+        if (!data.selectedSubjects.includes(id)) {
+          const subject = allSubjects.find(s => s.id === id);
+          newSubjectHours[id] = subject?.weeklyHours || 1;
+        }
+      });
+      
+      onUpdate({ 
+        selectedSubjects: newSelectedSubjects, 
+        subjectHours: newSubjectHours, 
+        subjectPriorities: data.subjectPriorities 
+      });
+      
+      success('✅ Tümü Seçildi', `${currentFilteredIds.length} ders seçildi`);
+    }
   };
 
   const handleHoursChange = (subjectId: string, hours: number) => {
@@ -114,77 +158,200 @@ const WizardStepSubjects: React.FC<WizardStepSubjectsProps> = ({ data, onUpdate 
     setFormData(prev => ({...prev, levels: prev.levels.includes(level) ? prev.levels.filter(l => l !== level) : [...prev.levels, level]}));
   };
 
+  // Filtrelenmiş derslerin seçim durumunu kontrol et
+  const filteredSelectedCount = filteredSubjects.filter(s => data.selectedSubjects.includes(s.id)).length;
+  const allFilteredSelected = filteredSubjects.length > 0 && filteredSelectedCount === filteredSubjects.length;
+
   return (
     <div className="space-y-6">
       <div className="text-center">
-        <div className="w-16 h-16 bg-indigo-100 rounded-full flex items-center justify-center mx-auto mb-4"><BookOpen className="w-8 h-8 text-indigo-600" /></div>
+        <div className="w-16 h-16 bg-indigo-100 rounded-full flex items-center justify-center mx-auto mb-4">
+          <BookOpen className="w-8 h-8 text-indigo-600" />
+        </div>
         <h3 className="text-lg font-semibold text-gray-900 mb-2">Ders Seçimi ve Konfigürasyonu</h3>
         <p className="text-gray-600">Programa dahil edilecek dersleri seçin ve haftalık saatlerini belirleyin</p>
       </div>
 
       <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
-        <div className="md:w-1/2"><Select label="Seviye Filtresi" value={selectedLevel} onChange={setSelectedLevel} options={[{ value: '', label: 'Tüm Seviyeler' }, ...EDUCATION_LEVELS.map(l => ({value: l, label: l}))]} /></div>
+        <div className="md:w-1/2">
+          <Select 
+            label="Seviye Filtresi" 
+            value={selectedLevel} 
+            onChange={setSelectedLevel} 
+            options={[{ value: '', label: 'Tüm Seviyeler' }, ...EDUCATION_LEVELS.map(l => ({value: l, label: l}))]} 
+          />
+        </div>
         <Button onClick={() => setIsModalOpen(true)} icon={Plus} variant="primary">Yeni Ders Ekle</Button>
       </div>
       
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <div>
-          <h4 className="font-medium text-gray-900 mb-3">Mevcut Dersler ({filteredSubjects.length})</h4>
+          <div className="flex items-center justify-between mb-3">
+            <h4 className="font-medium text-gray-900">Mevcut Dersler ({filteredSubjects.length})</h4>
+            
+            {/* YENİ: Tümünü Seç/Kaldır Butonu */}
+            {filteredSubjects.length > 0 && (
+              <Button
+                onClick={handleSelectAll}
+                icon={allFilteredSelected ? Square : CheckSquare}
+                variant={allFilteredSelected ? "secondary" : "primary"}
+                size="sm"
+              >
+                {allFilteredSelected ? 'Tümünü Kaldır' : 'Tümünü Seç'}
+                {selectedLevel && ` (${selectedLevel})`}
+              </Button>
+            )}
+          </div>
+          
           <div className="bg-gray-50 rounded-lg p-4 max-h-96 overflow-y-auto">
-            <div className="space-y-2">
-              {filteredSubjects.map(s => (
-                <div key={s.id} className={`p-3 rounded-lg border-2 transition-all ${data.selectedSubjects.includes(s.id) ? 'bg-blue-50 border-blue-300' : 'bg-white border-gray-200'}`}>
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="font-medium text-sm">{s.name}</p>
-                      <p className="text-xs text-gray-600">{s.branch} • {(s.levels || [s.level]).join(', ')} • {s.weeklyHours} sa/h</p>
-                    </div>
-                    <div className="flex items-center space-x-2">
-                      <button onClick={() => handleEdit(s)} className="p-1 text-gray-400 hover:text-blue-600"><Edit size={16} /></button>
-                      <button onClick={() => handleDelete(s.id)} className="p-1 text-gray-400 hover:text-red-600"><Trash2 size={16} /></button>
-                      <button onClick={() => handleSubjectToggle(s.id)} className={`w-6 h-6 rounded-full border-2 flex items-center justify-center ${data.selectedSubjects.includes(s.id) ? 'bg-blue-500 border-blue-500' : 'border-gray-300'}`}>
-                        {data.selectedSubjects.includes(s.id) ? <Minus className="w-3 h-3 text-white" /> : <Plus className="w-3 h-3 text-gray-500" />}
-                      </button>
+            {filteredSubjects.length === 0 ? (
+              <div className="text-center py-8">
+                <BookOpen className="w-12 h-12 text-gray-300 mx-auto mb-3" />
+                <p className="text-gray-500">
+                  {selectedLevel ? `${selectedLevel} seviyesinde ders bulunamadı` : 'Henüz ders eklenmemiş'}
+                </p>
+                <Button
+                  onClick={() => setIsModalOpen(true)}
+                  icon={Plus}
+                  variant="primary"
+                  size="sm"
+                  className="mt-3"
+                >
+                  İlk Dersi Ekle
+                </Button>
+              </div>
+            ) : (
+              <div className="space-y-2">
+                {filteredSubjects.map(s => (
+                  <div key={s.id} className={`p-3 rounded-lg border-2 transition-all ${data.selectedSubjects.includes(s.id) ? 'bg-blue-50 border-blue-300' : 'bg-white border-gray-200'}`}>
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="font-medium text-sm">{s.name}</p>
+                        <p className="text-xs text-gray-600">{s.branch} • {(s.levels || [s.level]).join(', ')} • {s.weeklyHours} sa/h</p>
+                      </div>
+                      <div className="flex items-center space-x-2">
+                        <button onClick={() => handleEdit(s)} className="p-1 text-gray-400 hover:text-blue-600">
+                          <Edit size={16} />
+                        </button>
+                        <button onClick={() => handleDelete(s.id)} className="p-1 text-gray-400 hover:text-red-600">
+                          <Trash2 size={16} />
+                        </button>
+                        <button 
+                          onClick={() => handleSubjectToggle(s.id)} 
+                          className={`w-6 h-6 rounded-full border-2 flex items-center justify-center ${
+                            data.selectedSubjects.includes(s.id) ? 'bg-blue-500 border-blue-500' : 'border-gray-300'
+                          }`}
+                        >
+                          {data.selectedSubjects.includes(s.id) ? (
+                            <Minus className="w-3 h-3 text-white" />
+                          ) : (
+                            <Plus className="w-3 h-3 text-gray-500" />
+                          )}
+                        </button>
+                      </div>
                     </div>
                   </div>
-                </div>
-              ))}
-            </div>
+                ))}
+              </div>
+            )}
           </div>
         </div>
+        
         <div>
           <div className="flex items-center justify-between mb-3">
             <h4 className="font-medium text-gray-900">Seçilen Dersler ({selectedSubjects.length})</h4>
-            <div className="text-sm text-gray-600">Toplam: <span className="font-bold text-blue-600">{getTotalWeeklyHours()} saat/hafta</span></div>
-          </div>
-          {selectedSubjects.length === 0 ? <div className="bg-gray-50 rounded-lg p-8 text-center"><BookOpen className="w-12 h-12 text-gray-300 mx-auto mb-3" /><p className="text-gray-500">Henüz ders seçilmedi</p></div> : 
-          <div className="bg-white rounded-lg border border-gray-200 p-4 max-h-96 overflow-y-auto">
-            <div className="space-y-3">
-              {selectedSubjects.map(s => (
-                <div key={s.id} className="p-3 bg-gray-50 rounded-lg">
-                  <div className="flex items-center justify-between mb-2">
-                    <div>
-                      <p className="font-medium text-sm">{s.name}</p>
-                      <p className="text-xs text-gray-600">{s.branch} • {(s.levels || [s.level]).join(', ')}</p>
-                    </div>
-                    <button onClick={() => handleSubjectToggle(s.id)} className="text-red-500 hover:text-red-700 p-1"><Minus className="w-4 h-4" /></button>
-                  </div>
-                  {/* ÖNCELİK BÖLÜMÜ KALDIRILDI */}
-                  <div>
-                    <label className="block text-xs font-medium text-gray-700 mb-1">Haftalık Saat</label>
-                    <div className="flex items-center space-x-2">
-                      <button type="button" onClick={() => handleHoursChange(s.id, (data.subjectHours[s.id] || 0) - 1)} className="w-6 h-6 bg-gray-200 rounded text-xs">-</button>
-                      <input type="number" min="1" value={data.subjectHours[s.id] || s.weeklyHours} onChange={(e) => handleHoursChange(s.id, parseInt(e.target.value) || 1)} className="w-12 text-center text-sm font-medium border border-gray-300 rounded py-1" />
-                      <button type="button" onClick={() => handleHoursChange(s.id, (data.subjectHours[s.id] || 0) + 1)} className="w-6 h-6 bg-gray-200 rounded text-xs">+</button>
-                    </div>
-                  </div>
-                </div>
-              ))}
+            <div className="text-sm text-gray-600">
+              Toplam: <span className="font-bold text-blue-600">{getTotalWeeklyHours()} saat/hafta</span>
             </div>
-          </div>}
+          </div>
+          
+          {selectedSubjects.length === 0 ? (
+            <div className="bg-gray-50 rounded-lg p-8 text-center">
+              <BookOpen className="w-12 h-12 text-gray-300 mx-auto mb-3" />
+              <p className="text-gray-500 mb-3">Henüz ders seçilmedi</p>
+              <p className="text-xs text-gray-400">
+                Sol taraftaki listeden ders seçin veya "Tümünü Seç" butonunu kullanın
+              </p>
+            </div>
+          ) : (
+            <div className="bg-white rounded-lg border border-gray-200 p-4 max-h-96 overflow-y-auto">
+              <div className="space-y-3">
+                {selectedSubjects.map(s => (
+                  <div key={s.id} className="p-3 bg-gray-50 rounded-lg">
+                    <div className="flex items-center justify-between mb-2">
+                      <div>
+                        <p className="font-medium text-sm">{s.name}</p>
+                        <p className="text-xs text-gray-600">{s.branch} • {(s.levels || [s.level]).join(', ')}</p>
+                      </div>
+                      <button 
+                        onClick={() => handleSubjectToggle(s.id)} 
+                        className="text-red-500 hover:text-red-700 p-1"
+                        title="Seçimi kaldır"
+                      >
+                        <Minus className="w-4 h-4" />
+                      </button>
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-gray-700 mb-1">Haftalık Saat</label>
+                      <div className="flex items-center space-x-2">
+                        <button 
+                          type="button" 
+                          onClick={() => handleHoursChange(s.id, (data.subjectHours[s.id] || 0) - 1)} 
+                          className="w-6 h-6 bg-gray-200 rounded text-xs hover:bg-gray-300 transition-colors"
+                        >
+                          -
+                        </button>
+                        <input 
+                          type="number" 
+                          min="1" 
+                          value={data.subjectHours[s.id] || s.weeklyHours} 
+                          onChange={(e) => handleHoursChange(s.id, parseInt(e.target.value) || 1)} 
+                          className="w-12 text-center text-sm font-medium border border-gray-300 rounded py-1 focus:outline-none focus:ring-2 focus:ring-blue-500" 
+                        />
+                        <button 
+                          type="button" 
+                          onClick={() => handleHoursChange(s.id, (data.subjectHours[s.id] || 0) + 1)} 
+                          className="w-6 h-6 bg-gray-200 rounded text-xs hover:bg-gray-300 transition-colors"
+                        >
+                          +
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
       </div>
-       <Modal isOpen={isModalOpen} onClose={resetForm} title={editingSubject ? 'Ders Düzenle' : 'Yeni Ders Ekle'} size="lg">
+
+      {/* Özet Bilgi */}
+      {selectedSubjects.length > 0 && (
+        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <h4 className="font-medium text-blue-900">Seçim Özeti</h4>
+              <p className="text-sm text-blue-700 mt-1">
+                {selectedSubjects.length} ders seçildi • Toplam {getTotalWeeklyHours()} saat/hafta
+              </p>
+            </div>
+            <div className="text-right">
+              <div className="text-2xl font-bold text-blue-600">{getTotalWeeklyHours()}</div>
+              <div className="text-xs text-blue-500">saat/hafta</div>
+            </div>
+          </div>
+          
+          {getTotalWeeklyHours() > 45 && (
+            <div className="mt-3 p-2 bg-yellow-100 border border-yellow-300 rounded">
+              <p className="text-sm text-yellow-800">
+                ⚠️ Haftalık toplam saat 45'i geçiyor. Program oluşturma sırasında sorun yaşayabilirsiniz.
+              </p>
+            </div>
+          )}
+        </div>
+      )}
+
+      <Modal isOpen={isModalOpen} onClose={resetForm} title={editingSubject ? 'Ders Düzenle' : 'Yeni Ders Ekle'} size="lg">
         <form onSubmit={handleSubmit} className="space-y-6">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <Input label="Ders Adı" value={formData.name} onChange={v => setFormData({...formData, name: v})} required />
@@ -193,9 +360,22 @@ const WizardStepSubjects: React.FC<WizardStepSubjectsProps> = ({ data, onUpdate 
           <Input label="Haftalık Ders Saati" type="number" value={formData.weeklyHours} onChange={v => setFormData({...formData, weeklyHours: v})} required />
           <div className="mb-4">
             <label className="block text-sm font-semibold text-gray-800 mb-2">Eğitim Seviyeleri<span className="text-red-500">*</span></label>
-            <div className="flex flex-wrap gap-3">{EDUCATION_LEVELS.map(level => (<label key={level} className={`flex items-center p-3 border-2 rounded-lg cursor-pointer ${formData.levels.includes(level) ? 'bg-indigo-50 border-indigo-500' : 'bg-white border-gray-300'}`}><input type="checkbox" checked={formData.levels.includes(level)} onChange={() => handleLevelToggle(level)} className="sr-only" /><span className="text-sm">{level}</span>{formData.levels.includes(level) && <span className="ml-2">✓</span>}</label>))}</div>
+            <div className="flex flex-wrap gap-3">
+              {EDUCATION_LEVELS.map(level => (
+                <label key={level} className={`flex items-center p-3 border-2 rounded-lg cursor-pointer ${formData.levels.includes(level) ? 'bg-indigo-50 border-indigo-500' : 'bg-white border-gray-300'}`}>
+                  <input type="checkbox" checked={formData.levels.includes(level)} onChange={() => handleLevelToggle(level)} className="sr-only" />
+                  <span className="text-sm">{level}</span>
+                  {formData.levels.includes(level) && <span className="ml-2">✓</span>}
+                </label>
+              ))}
+            </div>
           </div>
-          <div className="flex justify-end space-x-3 pt-4"><Button type="button" onClick={resetForm} variant="secondary">İptal</Button><Button type="submit" variant="primary" disabled={formData.levels.length === 0}>{editingSubject ? 'Güncelle' : 'Kaydet'}</Button></div>
+          <div className="flex justify-end space-x-3 pt-4">
+            <Button type="button" onClick={resetForm} variant="secondary">İptal</Button>
+            <Button type="submit" variant="primary" disabled={formData.levels.length === 0}>
+              {editingSubject ? 'Güncelle' : 'Kaydet'}
+            </Button>
+          </div>
         </form>
       </Modal>
     </div>
@@ -203,4 +383,3 @@ const WizardStepSubjects: React.FC<WizardStepSubjectsProps> = ({ data, onUpdate 
 };
 
 export default WizardStepSubjects;
-
